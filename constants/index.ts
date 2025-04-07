@@ -83,22 +83,19 @@ export const onboarding = [
   {
     id: 1,
     title: "BrgyExpress. All In One",
-    description:
-      "Your journey begins with Ryde. Find your ideal ride effortlessly.",
+    description: "Seamlessly interact with your Barangay!",
     image: images.onboarding1,
   },
   {
     id: 2,
     title: "Conveniently Request Document!",
-    description:
-      "Discover the convenience of finding your perfect ride with Ryde",
+    description: "Discover the convenience of obtaining requirements!",
     image: images.onboarding2,
   },
   {
     id: 3,
     title: "Easily Report Incidents near your Area!",
-    description:
-      "Enter your destination, sit back, and let us take care of the rest.",
+    description: "Make your barangay safe and sound!",
     image: images.onboarding3,
   },
 ];
