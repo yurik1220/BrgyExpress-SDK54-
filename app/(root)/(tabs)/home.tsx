@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Image, Dimensions, StyleSheet } from "react-native";
+import { View, Image, Dimensions } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "@/constants"; // Make sure this contains multiple images
 import Animated, {
@@ -9,10 +9,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { PanGestureHandler } from "react-native-gesture-handler";
 import CustomButton from "@/components/CustomButton"; // Make sure the path is correct
+import styles from "@/styles/styles"; // Import the styles
+import { useRouter } from "expo-router";
 
 const { width } = Dimensions.get("window");
 
 export default function Page() {
+  const router = useRouter();
   const slideshowImages = [
     images.slideshow1,
     images.slideshow2,
@@ -70,86 +73,37 @@ export default function Page() {
         </PanGestureHandler>
       </View>
 
-      {/* 3 Square Buttons in the Middle */}
+      {/* Button Container */}
       <View style={styles.buttonContainer}>
-        <View style={styles.squareButtonWrapper}>
+        {/* Top Row - Button 1 and 2 */}
+        <View style={styles.topRow}>
           <CustomButton
             title="Button 1"
-            onPress={() => alert("Button 1 Pressed")}
+            onPress={() => router.push("/create-id")}
             bgVariant="primary"
             textVariant="default"
-            className="rounded-lg" // Optional: Use `rounded-lg` to give some rounded corners
+            className="rounded-lg"
+            style={styles.bigButton}
           />
-        </View>
-        <View style={styles.squareButtonWrapper}>
           <CustomButton
             title="Button 2"
-            onPress={() => alert("Button 2 Pressed")}
+            onPress={() => router.push("/request-documents")}
             bgVariant="secondary"
             textVariant="default"
             className="rounded-lg"
+            style={styles.bigButton}
           />
         </View>
-        <View style={styles.squareButtonWrapper}>
-          <CustomButton
-            title="Button 3"
-            onPress={() => alert("Button 3 Pressed")}
-            bgVariant="success"
-            textVariant="default"
-            className="rounded-lg"
-          />
-        </View>
+
+        {/* Bottom - Button 3 */}
+        <CustomButton
+          title="Button 3"
+          onPress={() => router.push("/incident-report")}
+          bgVariant="success"
+          textVariant="default"
+          style={styles.rectButton}
+        />
       </View>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  logo: {
-    width: 150,
-    height: 150,
-    resizeMode: "contain",
-    position: "absolute",
-    top: -40,
-    left: -20,
-  },
-  slideshowContainer: {
-    width: 300,
-    height: 125,
-    backgroundColor: "#ddd",
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    alignSelf: "center",
-    marginTop: 60,
-    overflow: "hidden",
-  },
-  imageWrapper: {
-    width: "100%",
-    height: "100%",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "stretch",
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "center", // Center buttons horizontally
-    alignItems: "center", // Center buttons vertically
-    marginTop: 30, // Adjust the top margin as needed
-    width: "100%", // Ensure the buttons are within the container width
-    height: 100, // Increased height for the container
-  },
-  squareButtonWrapper: {
-    width: 80, // Increased width for square button
-    height: 80, // Increased height for square button
-    margin: 10, // Space between buttons
-    justifyContent: "center", // Center button contents horizontally
-    alignItems: "center", // Center button contents vertically
-  },
-});

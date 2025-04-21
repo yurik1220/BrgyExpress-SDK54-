@@ -5,14 +5,31 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c4aed26e-2a4d-466a-9429-ad5a2310053d" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/app/(root)/(screens)/_layout.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/(root)/(screens)/create-id.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/(root)/(screens)/details.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/(root)/(screens)/incident-report.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/(root)/(screens)/request-documents.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/styles/styles.js" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.json" beforeDir="false" afterPath="$PROJECT_DIR$/app.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/constants/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/constants/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(root)/(tabs)/home.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(root)/(tabs)/home.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/(root)/_layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(root)/_layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/components/CustomButton.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/CustomButton.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tailwind.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/tailwind.config.js" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="JavaScript File" />
+      </list>
+    </option>
   </component>
   <component name="FormatOnSaveOptions">
     <option name="myRunOnSave" value="true" />
@@ -78,7 +95,13 @@
       <workItem from="1743597167915" duration="12252000" />
       <workItem from="1743648394912" duration="2425000" />
       <workItem from="1744038161521" duration="583000" />
-      <workItem from="1744043822151" duration="2041000" />
+      <workItem from="1744043822151" duration="2106000" />
+      <workItem from="1744688708988" duration="5770000" />
+      <workItem from="1744697890863" duration="1484000" />
+      <workItem from="1744702834985" duration="4872000" />
+      <workItem from="1744712015089" duration="2060000" />
+      <workItem from="1745125398578" duration="99000" />
+      <workItem from="1745213572508" duration="1817000" />
     </task>
     <servers />
   </component>
@@ -96,6 +119,10 @@
         <line-breakpoint enabled="true" type="javascript">
           <url>file://$PROJECT_DIR$/app/_layout.tsx</url>
           <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/components/InputField.tsx</url>
+          <option name="timeStamp" value="4" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
