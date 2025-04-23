@@ -7,12 +7,13 @@ import {
   Image,
   ScrollView,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import axios from "axios";
 import styles from "@/styles/styles";
 
-// Define the type for media
 type Media = ImagePicker.ImagePickerAsset | null;
 
 export default function IncidentReport() {
@@ -35,31 +36,54 @@ export default function IncidentReport() {
 
   const handleSubmit = async () => {
     if (!description || !media) {
-      alert("Please fill out all fields.");
+      Alert.alert("Missing Fields", "Please fill out all fields.");
       return;
     }
 
     if (isSubmitting) return;
-
     setIsSubmitting(true);
 
-    // ✅ ENCODE the URI before sending it via params
-    const mediaUri = encodeURIComponent(media.uri);
+    try {
+      const formData = new FormData();
+      formData.append("type", "Incident Report");
+      formData.append("description", description);
+      formData.append("user", "User Name");
 
-    const reportData = {
-      type: "Incident Report",
-      description,
-      media: mediaUri,
-    };
+      const file = {
+        uri: media.uri,
+        name: media.uri.split("/").pop() || "media",
+        type: media.mimeType || "image/jpeg", // Use mimeType instead of media.type
+      };
 
-    router.push({
-      pathname: "/details",
-      params: reportData,
-    });
+      formData.append("media", file as any); // Cast to any to bypass TS issues
 
-    setDescription("");
-    setMedia(null);
-    setIsSubmitting(false);
+      const response = await axios.post(
+        "http://192.168.254.106:5000/api/requests", // 🔁 replace with your computer's IP
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        },
+      );
+
+      console.log("Report submitted:", response.data);
+
+      router.push({
+        pathname: "/details",
+        params: { ...response.data },
+      });
+
+      setDescription("");
+      setMedia(null);
+      setIsSubmitting(false);
+
+      Alert.alert("Success", "Incident report submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting request:", error);
+      Alert.alert("Error", "There was an error submitting your request.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
