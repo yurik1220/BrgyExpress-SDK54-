@@ -1,32 +1,65 @@
-import { View, Text, TextInput, ScrollView, Button } from "react-native";
+import { View, Text, TextInput, ScrollView, Button, Alert } from "react-native";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router"; // Correct import for useRouter
+import { useRouter } from "expo-router";
+import axios from "axios";
 
-export default function CreateIDScreen() {
+// Define type for request data
+interface RequestData {
+  type: string;
+  name: string;
+  birthdate: string;
+  userAddress: string;
+  contact: string;
+  user: string;
+}
+
+const CreateIDScreen = () => {
   const router = useRouter();
 
   const [fullName, setFullName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [address, setAddress] = useState("");
   const [contactNumber, setContactNumber] = useState("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const handleSubmit = () => {
-    // You can send this data to your backend here
-    alert("Barangay ID request submitted!");
+  const handleSubmit = async () => {
+    if (!fullName || !birthDate || !address || !contactNumber) {
+      Alert.alert("Missing Fields", "Please fill out all the fields.");
+      return;
+    }
 
-    // Navigate to the details screen and pass the data using params
-    router.push({
-      pathname: "/details", // Make sure this matches the details route
-      params: {
-        documentType: "Barangay ID", // You can replace this with actual type
-        reason: "Request for Barangay ID", // Replace with the reason
-        fullName,
-        birthDate,
-        address,
-        contactNumber,
-      },
-    });
+    const requestData: RequestData = {
+      type: "Create ID",
+      name: fullName,
+      birthdate: birthDate,
+      userAddress: address,
+      contact: contactNumber,
+      user: "User Name", // Replace with actual user info
+    };
+
+    try {
+      setLoading(true);
+
+      const response = await axios.post(
+        "http://192.168.254.106:5000/api/requests",
+        requestData,
+      );
+
+      console.log("Request submitted successfully:", response.data);
+
+      router.push({
+        pathname: "/details",
+        params: { ...requestData },
+      });
+
+      Alert.alert("Success", "Barangay ID request submitted successfully!");
+    } catch (error) {
+      console.error("Error submitting request:", error);
+      Alert.alert("Error", "There was an error submitting your request.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -67,8 +100,15 @@ export default function CreateIDScreen() {
           className="border border-gray-300 rounded-md px-3 py-2 mb-6"
         />
 
-        <Button title="Submit Request" onPress={handleSubmit} color="#4CAF50" />
+        <Button
+          title={loading ? "Submitting..." : "Submit Request"}
+          onPress={handleSubmit}
+          color="#4CAF50"
+          disabled={loading}
+        />
       </ScrollView>
     </SafeAreaView>
   );
-}
+};
+
+export default CreateIDScreen;
