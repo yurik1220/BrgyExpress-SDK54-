@@ -1,56 +1,105 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "../styles/Requests.css"; // Reuse the same CSS file for consistency
+import "../styles/DocumentRequests.css"; // Reuse same styles for consistency
 
 const IncidentReports = () => {
-    const [reports, setReports] = useState([]);
+    const [incidents, setIncidents] = useState([]);
+    const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [selectedIncident, setSelectedIncident] = useState(null);
+    const [activeTab, setActiveTab] = useState("pending"); // Tab to toggle between "Pending" and "History Log"
 
     useEffect(() => {
         const fetchIncidentReports = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/requests");
-                const filteredReports = response.data.filter(
-                    (request) => request.type === "Incident Report"
-                );
-                setReports(filteredReports);
+                const filtered = response.data.filter(req => req.type === "Incident Report");
+                setIncidents(filtered);
             } catch (error) {
                 setError("Error fetching incident reports");
             } finally {
                 setLoading(false);
             }
         };
-
         fetchIncidentReports();
     }, []);
 
-    if (loading) return <p className="loading">Loading incident reports...</p>;
-    if (error) return <p className="error">{error}</p>;
+    const handleDecision = (status) => {
+        setHistory(prev => [...prev, { ...selectedIncident, status }]);
+        setIncidents(prev => prev.filter(incident => incident !== selectedIncident));
+        setSelectedIncident(null);
+    };
+
+    if (loading) return <p>Loading incident reports...</p>;
+    if (error) return <p>{error}</p>;
 
     return (
         <div className="requests-container">
-            <h2 className="section-title">🚨 Incident Reports</h2>
-            {reports.length > 0 ? (
-                <div className="card-grid">
-                    {reports.map((report, index) => (
-                        <div key={index} className="request-card">
-                            <p><strong>📌 Type:</strong> {report.type}</p>
-                            <p><strong>📝 Description:</strong> {report.description}</p>
-                            <p><strong>👤 Reported by:</strong> {report.user}</p>
-                            {report.media ? (
-                                <div>
-                                    <strong>📷 Media:</strong><br />
-                                    <img src={report.media} alt="incident" width="100" />
-                                </div>
-                            ) : (
-                                <p><em>No media provided.</em></p>
-                            )}
+            <h2>🚨 Incident Reports</h2>
+
+            <div className="tabs">
+                <button
+                    className={activeTab === "pending" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("pending")}
+                >
+                    Pending Reports
+                </button>
+                <button
+                    className={activeTab === "history" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("history")}
+                >
+                    History Log
+                </button>
+            </div>
+
+            {activeTab === "pending" && (
+                <>
+                    {incidents.length > 0 ? (
+                        <ul className="request-list">
+                            {incidents.map((incident, index) => (
+                                <li key={index} className="request-item" onClick={() => setSelectedIncident(incident)}>
+                                    <p><strong>{incident.description}</strong> reported by <strong>{incident.user}</strong></p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No pending incident reports.</p>
+                    )}
+                </>
+            )}
+
+            {activeTab === "history" && (
+                <>
+                    {history.length > 0 ? (
+                        <ul className="request-list">
+                            {history.map((incident, index) => (
+                                <li key={index} className={`request-item ${incident.status.toLowerCase()}`}>
+                                    <p><strong>{incident.description}</strong> reported by <strong>{incident.user}</strong> — <em>{incident.status}</em></p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No history available.</p>
+                    )}
+                </>
+            )}
+
+            {selectedIncident && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>Incident Details</h3>
+                        <p><strong>Description:</strong> {selectedIncident.description}</p>
+                        <p><strong>Reported by:</strong> {selectedIncident.user}</p>
+                        <p><strong>Reason:</strong> {selectedIncident.reason}</p>
+                        {selectedIncident.media && <img src={selectedIncident.media} alt="Incident Media" width="150" />}
+                        <div className="modal-buttons">
+                            <button onClick={() => handleDecision("Approved")} className="approve">Approve</button>
+                            <button onClick={() => handleDecision("Rejected")} className="reject">Reject</button>
                         </div>
-                    ))}
+                        <button onClick={() => setSelectedIncident(null)} className="close">Close</button>
+                    </div>
                 </div>
-            ) : (
-                <p className="no-data">No incident reports to display.</p>
             )}
         </div>
     );
