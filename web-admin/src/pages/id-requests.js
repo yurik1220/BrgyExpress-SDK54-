@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import "../styles/DocumentRequests.css"; // Use the same shared CSS or create custom for this file
+import "../styles/DocumentRequests.css"; // shared styles
 
 const CreateIDRequests = () => {
     const [idRequests, setIdRequests] = useState([]);
@@ -9,6 +9,9 @@ const CreateIDRequests = () => {
     const [error, setError] = useState(null);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
+
+    const [showRejectForm, setShowRejectForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState("");
 
     useEffect(() => {
         const fetchIDRequests = async () => {
@@ -29,9 +32,16 @@ const CreateIDRequests = () => {
     }, []);
 
     const handleDecision = (status) => {
-        setHistory(prev => [...prev, { ...selectedRequest, status }]);
+        const updatedRequest = {
+            ...selectedRequest,
+            status,
+            rejectionReason: status === "Rejected" ? rejectionReason : undefined,
+        };
+        setHistory(prev => [...prev, updatedRequest]);
         setIdRequests(prev => prev.filter(req => req !== selectedRequest));
         setSelectedRequest(null);
+        setShowRejectForm(false);
+        setRejectionReason("");
     };
 
     if (loading) return <p>Loading ID requests...</p>;
@@ -79,6 +89,9 @@ const CreateIDRequests = () => {
                             {history.map((req, index) => (
                                 <li key={index} className={`request-item ${req.status.toLowerCase()}`}>
                                     <p><strong>{req.fullName}</strong> — <em>{req.status}</em></p>
+                                    {req.rejectionReason && (
+                                        <p><strong>Rejection Reason:</strong> {req.rejectionReason}</p>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -88,20 +101,63 @@ const CreateIDRequests = () => {
                 </>
             )}
 
-            {selectedRequest && (
+            {selectedRequest && !showRejectForm && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <h3>Request Details</h3>
                         <p><strong>Full Name:</strong> {selectedRequest.name}</p>
                         <p><strong>Birth Date:</strong> {selectedRequest.birthdate}</p>
-                        <p><strong>Address:</strong> {selectedRequest.address}</p>
+                        <p><strong>Address:</strong> {selectedRequest.userAddress}</p>
                         <p><strong>Contact:</strong> {selectedRequest.contact}</p>
                         {selectedRequest.media && <img src={selectedRequest.media} alt="ID request" width="150" />}
                         <div className="modal-buttons">
                             <button onClick={() => handleDecision("Approved")} className="approve">Approve</button>
-                            <button onClick={() => handleDecision("Rejected")} className="reject">Reject</button>
+                            <button
+                                onClick={() => setShowRejectForm(true)}
+                                className="reject"
+                            >
+                                Reject
+                            </button>
                         </div>
                         <button onClick={() => setSelectedRequest(null)} className="close">Close</button>
+                    </div>
+                </div>
+            )}
+
+            {showRejectForm && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>Reason for Rejection</h3>
+                        <textarea
+                            placeholder="Enter rejection reason..."
+                            rows="5"
+                            style={{ width: "100%" }}
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                        />
+                        <div className="modal-buttons" style={{ marginTop: "1rem" }}>
+                            <button
+                                onClick={() => {
+                                    if (!rejectionReason.trim()) {
+                                        alert("Please provide a reason.");
+                                        return;
+                                    }
+                                    handleDecision("Rejected");
+                                }}
+                                className="reject"
+                            >
+                                Confirm Rejection
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowRejectForm(false);
+                                    setRejectionReason("");
+                                }}
+                                className="close"
+                            >
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

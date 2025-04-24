@@ -10,6 +10,9 @@ const DocumentRequests = () => {
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
 
+    const [showRejectForm, setShowRejectForm] = useState(false); // toggle reject form
+    const [rejectionReason, setRejectionReason] = useState(""); // store input reason
+
     useEffect(() => {
         const fetchDocumentRequests = async () => {
             try {
@@ -26,9 +29,23 @@ const DocumentRequests = () => {
     }, []);
 
     const handleDecision = (status) => {
-        setHistory(prev => [...prev, { ...selectedRequest, status }]);
+        setHistory(prev => [...prev, { ...selectedRequest, status, rejectionReason }]);
         setRequests(prev => prev.filter(req => req !== selectedRequest));
         setSelectedRequest(null);
+        setShowRejectForm(false);
+        setRejectionReason("");
+    };
+
+    const handleRejectClick = () => {
+        setShowRejectForm(true);
+    };
+
+    const confirmRejection = () => {
+        if (!rejectionReason.trim()) {
+            alert("Please enter a reason for rejection.");
+            return;
+        }
+        handleDecision("Rejected");
     };
 
     if (loading) return <p>Loading document requests...</p>;
@@ -39,16 +56,10 @@ const DocumentRequests = () => {
             <h2>📄 Document Requests</h2>
 
             <div className="tabs">
-                <button
-                    className={activeTab === "pending" ? "active-tab" : ""}
-                    onClick={() => setActiveTab("pending")}
-                >
+                <button className={activeTab === "pending" ? "active-tab" : ""} onClick={() => setActiveTab("pending")}>
                     Pending Requests
                 </button>
-                <button
-                    className={activeTab === "history" ? "active-tab" : ""}
-                    onClick={() => setActiveTab("history")}
-                >
+                <button className={activeTab === "history" ? "active-tab" : ""} onClick={() => setActiveTab("history")}>
                     History Log
                 </button>
             </div>
@@ -76,6 +87,9 @@ const DocumentRequests = () => {
                             {history.map((req, index) => (
                                 <li key={index} className={`request-item ${req.status.toLowerCase()}`}>
                                     <p><strong>{req.document}</strong> by <strong>{req.user}</strong> — <em>{req.status}</em></p>
+                                    {req.status === "Rejected" && req.rejectionReason && (
+                                        <p><strong>Reason:</strong> {req.rejectionReason}</p>
+                                    )}
                                 </li>
                             ))}
                         </ul>
@@ -85,7 +99,7 @@ const DocumentRequests = () => {
                 </>
             )}
 
-            {selectedRequest && (
+            {selectedRequest && !showRejectForm && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <h3>Request Details</h3>
@@ -96,12 +110,63 @@ const DocumentRequests = () => {
                         {selectedRequest.media && <img src={selectedRequest.media} alt="Media" width="150" />}
                         <div className="modal-buttons">
                             <button onClick={() => handleDecision("Approved")} className="approve">Approve</button>
-                            <button onClick={() => handleDecision("Rejected")} className="reject">Reject</button>
+                            <button
+                                onClick={() => {
+                                    setShowRejectForm(true);
+                                }}
+                                className="reject"
+                            >
+                                Reject
+                            </button>
                         </div>
-                        <button onClick={() => setSelectedRequest(null)} className="close">Close</button>
+                        <button
+                            onClick={() => setSelectedRequest(null)}
+                            className="close"
+                        >
+                            Close
+                        </button>
                     </div>
                 </div>
             )}
+
+            {showRejectForm && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>Reason for Rejection</h3>
+                        <textarea
+                            placeholder="Enter rejection reason..."
+                            rows="5"
+                            style={{ width: "100%" }}
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                        />
+                        <div className="modal-buttons" style={{ marginTop: "1rem" }}>
+                            <button
+                                onClick={() => {
+                                    if (!rejectionReason.trim()) {
+                                        alert("Please provide a reason.");
+                                        return;
+                                    }
+                                    handleDecision("Rejected");
+                                }}
+                                className="reject"
+                            >
+                                Confirm Rejection
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowRejectForm(false);
+                                    setRejectionReason("");
+                                }}
+                                className="close"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 };
