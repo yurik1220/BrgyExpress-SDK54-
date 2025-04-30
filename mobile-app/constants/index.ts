@@ -35,6 +35,10 @@ import logo from "@/assets/images/logo.png";
 import slideshow1 from "@/assets/images/slideshow1.png";
 import slideshow2 from "@/assets/images/slideshow2.png";
 import slideshow3 from "@/assets/images/slideshow3.png";
+import warning from "@/assets/images/warning.png";
+import incident from "@/assets/images/incident_button.png";
+import request from "@/assets/images/request_button.png";
+import id from "@/assets/images/id_button.png";
 
 export const images = {
   onboarding1,
@@ -49,6 +53,10 @@ export const images = {
   slideshow1,
   slideshow2,
   slideshow3,
+  warning,
+  incident,
+  request,
+  id,
 };
 
 export const icons = {

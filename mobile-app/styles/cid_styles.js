@@ -1,0 +1,120 @@
+import { StyleSheet, Platform, Dimensions } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+
+const { width, height } = Dimensions.get('window');
+
+export const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#f8fafc',
+    },
+    gradientBackground: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        height: height * 0.25,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
+    },
+    scrollContainer: {
+        paddingHorizontal: 28,
+        paddingTop: 24,
+        paddingBottom: 40,
+    },
+    header: {
+        marginBottom: 32,
+        alignItems: 'center',
+    },
+    heading: {
+        fontSize: 28,
+        fontWeight: '800',
+        color: '#0f172a',
+        marginBottom: 8,
+        fontFamily: Platform.OS === 'ios' ? 'SF Pro Display' : 'Roboto',
+        letterSpacing: -0.5,
+    },
+    subheading: {
+        fontSize: 16,
+        color: '#64748b',
+        textAlign: 'center',
+        paddingHorizontal: 20,
+        lineHeight: 24,
+    },
+    inputContainer: {
+        marginBottom: 24,
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#475569',
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    input: {
+        backgroundColor: '#ffffff',
+        borderRadius: 14,
+        paddingHorizontal: 18,
+        paddingVertical: 16,
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+        elevation: 2,
+    },
+    submitButton: {
+        backgroundColor: '#2563eb',
+        borderRadius: 16,
+        paddingVertical: 18,
+        marginTop: 16,
+        shadowColor: '#2563eb',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
+    },
+    buttonText: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: '600',
+        textAlign: 'center',
+    },
+    floatingDecoration: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        backgroundColor: 'rgba(37, 99, 235, 0.05)',
+        top: -50,
+        right: -50,
+    },
+    floatingDecoration2: {
+        position: 'absolute',
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+        backgroundColor: 'rgba(37, 99, 235, 0.03)',
+        bottom: -30,
+        left: -30,
+    },
+    iconContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    iconBackground: {
+        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    icon: {
+        width: 50,
+        height: 50,
+        tintColor: '#2563eb',
+    },
+});

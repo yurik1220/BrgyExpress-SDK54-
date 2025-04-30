@@ -13,8 +13,8 @@ const RequestList = () => {
                 // Handle different possible structures of the response
                 if (Array.isArray(res.data)) {
                     setRequests(res.data);
-                } else if (Array.isArray(res.data.requests)) {
-                    setRequests(res.data.requests);
+                } else if (Array.isArray(res.data.document_requests)) {
+                    setRequests(res.data.document_requests); // Adjusted field name
                 } else {
                     console.error("Unexpected response format:", res.data);
                     setRequests([]);
@@ -41,7 +41,7 @@ const RequestList = () => {
                     {requests.map((request, index) => (
                         <li key={index} className="bg-white p-4 shadow rounded">
                             <p><strong>Name:</strong> {request.name}</p>
-                            <p><strong>Type:</strong> {request.type}</p>
+                            <p><strong>Document Type:</strong> {request.document_type}</p> {/* Adjusted field name */}
                             <p><strong>Status:</strong> {request.status}</p>
                         </li>
                     ))}
