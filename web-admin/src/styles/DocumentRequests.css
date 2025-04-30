@@ -88,3 +88,64 @@
     color: white;
     font-weight: bold;
 }
+.history-filters {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+}
+
+.history-filters button {
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+}
+
+.history-filters button.active-filter {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.request-item.approved {
+    border-left: 4px solid #28a745;
+}
+
+.request-item.rejected {
+    border-left: 4px solid #dc3545;
+}
+
+.media-container {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+/* Appointment Modal Styles */
+.appointment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.appointment-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.appointment-form input[type="date"],
+.appointment-form input[type="time"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 16px;
+}
+
+.appointment-note {
+    font-size: 14px;
+    color: #666;
+    margin-top: 10px;
+}

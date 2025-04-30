@@ -193,6 +193,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
+  imageBackground: {
+    width: 100,      // or '100%' if responsive
+    height: 100,     // adjust based on your button image size
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
 
 export default styles;

@@ -3,24 +3,33 @@ import axios from "axios";
 import "../styles/DocumentRequests.css";
 
 const DocumentRequests = () => {
-    const [requests, setRequests] = useState([]);
+    const [pendingRequests, setPendingRequests] = useState([]);
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
-
-    const [showRejectForm, setShowRejectForm] = useState(false); // toggle reject form
-    const [rejectionReason, setRejectionReason] = useState(""); // store input reason
+    const [showRejectForm, setShowRejectForm] = useState(false);
+    const [rejectionReason, setRejectionReason] = useState("");
+    const [historyFilter, setHistoryFilter] = useState("all");
+    const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+    const [appointmentDate, setAppointmentDate] = useState("");
+    const [appointmentTime, setAppointmentTime] = useState("");
 
     useEffect(() => {
         const fetchDocumentRequests = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/requests");
-                const filtered = response.data.filter(req => req.type === "Document Request");
-                setRequests(filtered);
+                const allRequests = response.data.filter(req => req.type === "Document Request");
+
+                const pending = allRequests.filter(req => !req.status || req.status === 'pending');
+                const resolved = allRequests.filter(req => req.status && req.status !== 'pending');
+
+                setPendingRequests(pending);
+                setHistory(resolved);
             } catch (error) {
                 setError("Error fetching document requests");
+                console.error("Fetch error:", error);
             } finally {
                 setLoading(false);
             }
@@ -28,12 +37,90 @@ const DocumentRequests = () => {
         fetchDocumentRequests();
     }, []);
 
-    const handleDecision = (status) => {
-        setHistory(prev => [...prev, { ...selectedRequest, status, rejectionReason }]);
-        setRequests(prev => prev.filter(req => req !== selectedRequest));
-        setSelectedRequest(null);
-        setShowRejectForm(false);
-        setRejectionReason("");
+    const handleApproveWithAppointment = async () => {
+        if (!appointmentDate || !appointmentTime) {
+            alert("Please select both date and time for the appointment");
+            return;
+        }
+
+        const appointmentDateTime = `${appointmentDate}T${appointmentTime}:00.000Z`;
+
+        try {
+            const payload = {
+                status: 'approved',
+                resolved_at: new Date().toISOString(),
+                appointment_date: appointmentDateTime
+            };
+
+            const response = await axios.patch(
+                `http://localhost:5000/api/document-requests/${selectedRequest.id}`,
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data && response.data.id) {
+                setPendingRequests(prev => prev.filter(req => req.id !== selectedRequest.id));
+                setHistory(prev => [response.data, ...prev]);
+                setSelectedRequest(null);
+                setShowAppointmentModal(false);
+                setAppointmentDate("");
+                setAppointmentTime("");
+            } else {
+                throw new Error("Invalid response from server");
+            }
+        } catch (error) {
+            console.error("Update error:", error);
+            alert("Failed to schedule appointment. Please try again.");
+        }
+    };
+
+    const handleDecision = async (status) => {
+        if (!selectedRequest) return;
+
+        try {
+            const normalizedStatus = status.toLowerCase();
+            const payload = {
+                status: normalizedStatus,
+                resolved_at: new Date().toISOString()
+            };
+
+            if (normalizedStatus === 'rejected') {
+                payload.rejection_reason = rejectionReason;
+            }
+
+            const response = await axios.patch(
+                `http://localhost:5000/api/document-requests/${selectedRequest.id}`,
+                payload,
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.data && response.data.id) {
+                setPendingRequests(prev => prev.filter(req => req.id !== selectedRequest.id));
+                setHistory(prev => [response.data, ...prev]);
+                setSelectedRequest(null);
+                setShowRejectForm(false);
+                setRejectionReason("");
+            } else {
+                throw new Error("Invalid response from server");
+            }
+        } catch (error) {
+            console.error("Update error:", error);
+            let errorMessage = "Failed to update request status";
+            if (error.response) {
+                errorMessage = error.response.data?.error || errorMessage;
+            } else if (error.request) {
+                errorMessage = "No response from server. Please check your connection.";
+            }
+            alert(errorMessage);
+        }
     };
 
     const handleRejectClick = () => {
@@ -48,77 +135,141 @@ const DocumentRequests = () => {
         handleDecision("Rejected");
     };
 
-    if (loading) return <p>Loading document requests...</p>;
-    if (error) return <p>{error}</p>;
+    const filteredHistory = history.filter(request => {
+        if (historyFilter === "all") return true;
+        return request.status.toLowerCase() === historyFilter.toLowerCase();
+    });
+
+    if (loading) return <div className="loading-message">Loading document requests...</div>;
+    if (error) return <div className="error-message">{error}</div>;
 
     return (
         <div className="requests-container">
             <h2>📄 Document Requests</h2>
 
             <div className="tabs">
-                <button className={activeTab === "pending" ? "active-tab" : ""} onClick={() => setActiveTab("pending")}>
+                <button
+                    className={activeTab === "pending" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("pending")}
+                >
                     Pending Requests
                 </button>
-                <button className={activeTab === "history" ? "active-tab" : ""} onClick={() => setActiveTab("history")}>
+                <button
+                    className={activeTab === "history" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("history")}
+                >
                     History Log
                 </button>
             </div>
 
             {activeTab === "pending" && (
-                <>
-                    {requests.length > 0 ? (
+                <div className="request-list-container">
+                    {pendingRequests.length > 0 ? (
                         <ul className="request-list">
-                            {requests.map((request, index) => (
-                                <li key={index} className="request-item" onClick={() => setSelectedRequest(request)}>
-                                    <p><strong>{request.document}</strong> requested by <strong>{request.user}</strong></p>
+                            {pendingRequests.map((request) => (
+                                <li
+                                    key={request.id}
+                                    className="request-item"
+                                    onClick={() => setSelectedRequest(request)}
+                                >
+                                    <p>
+                                        <strong>{request.document_type}</strong> requested by Clerk ID: {request.clerk_id}
+                                        <br />
+                                        <small>{new Date(request.created_at).toLocaleString()}</small>
+                                    </p>
+                                    <p>Reason: {request.reason}</p>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p>No pending document requests.</p>
+                        <p className="no-requests-message">No pending document requests.</p>
                     )}
-                </>
+                </div>
             )}
 
             {activeTab === "history" && (
                 <>
-                    {history.length > 0 ? (
-                        <ul className="request-list">
-                            {history.map((req, index) => (
-                                <li key={index} className={`request-item ${req.status.toLowerCase()}`}>
-                                    <p><strong>{req.document}</strong> by <strong>{req.user}</strong> — <em>{req.status}</em></p>
-                                    {req.status === "Rejected" && req.rejectionReason && (
-                                        <p><strong>Reason:</strong> {req.rejectionReason}</p>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p>No history available.</p>
-                    )}
+                    <div className="history-filters">
+                        <button
+                            className={historyFilter === "all" ? "active-filter" : ""}
+                            onClick={() => setHistoryFilter("all")}
+                        >
+                            All
+                        </button>
+                        <button
+                            className={historyFilter === "approved" ? "active-filter" : ""}
+                            onClick={() => setHistoryFilter("approved")}
+                        >
+                            Approved
+                        </button>
+                        <button
+                            className={historyFilter === "rejected" ? "active-filter" : ""}
+                            onClick={() => setHistoryFilter("rejected")}
+                        >
+                            Rejected
+                        </button>
+                    </div>
+
+                    <div className="history-list-container">
+                        {filteredHistory.length > 0 ? (
+                            <ul className="request-list">
+                                {filteredHistory.map((request) => (
+                                    <li
+                                        key={request.id}
+                                        className={`request-item ${request.status.toLowerCase()}`}
+                                        onClick={() => setSelectedRequest(request)}
+                                    >
+                                        <p>
+                                            <strong>{request.document_type}</strong> (Clerk ID: {request.clerk_id}) —
+                                            <em> {request.status}</em>
+                                        </p>
+                                        <p>Reason: {request.reason}</p>
+                                        {request.status.toLowerCase() === 'approved' && request.appointment_date && (
+                                            <p><strong>Pickup Date:</strong> {new Date(request.appointment_date).toLocaleString()}</p>
+                                        )}
+                                        <small>
+                                            Submitted: {new Date(request.created_at).toLocaleString()} |
+                                            Resolved: {new Date(request.resolved_at).toLocaleString()}
+                                        </small>
+                                        {request.status.toLowerCase() === 'rejected' && request.rejection_reason && (
+                                            <p><strong>Rejection Reason:</strong> {request.rejection_reason}</p>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="no-history-message">No {historyFilter === "all" ? "" : historyFilter} requests in history.</p>
+                        )}
+                    </div>
                 </>
             )}
 
-            {selectedRequest && !showRejectForm && (
+            {selectedRequest && !showRejectForm && !showAppointmentModal && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <h3>Request Details</h3>
-                        <p><strong>Request Type:</strong> {selectedRequest.type}</p>
-                        <p><strong>Document:</strong> {selectedRequest.document}</p>
-                        <p><strong>Reason:</strong> {selectedRequest.reason}</p>
-                        <p><strong>User:</strong> {selectedRequest.user}</p>
-                        {selectedRequest.media && <img src={selectedRequest.media} alt="Media" width="150" />}
-                        <div className="modal-buttons">
-                            <button onClick={() => handleDecision("Approved")} className="approve">Approve</button>
-                            <button
-                                onClick={() => {
-                                    setShowRejectForm(true);
-                                }}
-                                className="reject"
-                            >
-                                Reject
-                            </button>
+                        <div className="modal-content">
+                            <p><strong>Document Type:</strong> {selectedRequest.document_type}</p>
+                            <p><strong>Clerk ID:</strong> {selectedRequest.clerk_id}</p>
+                            <p><strong>Reason:</strong> {selectedRequest.reason}</p>
+                            <p><strong>Date Submitted:</strong> {new Date(selectedRequest.created_at).toLocaleString()}</p>
                         </div>
+                        {(!selectedRequest.status || selectedRequest.status === 'pending') && (
+                            <div className="modal-buttons">
+                                <button
+                                    onClick={() => setShowAppointmentModal(true)}
+                                    className="approve"
+                                >
+                                    Approve
+                                </button>
+                                <button
+                                    onClick={handleRejectClick}
+                                    className="reject"
+                                >
+                                    Reject
+                                </button>
+                            </div>
+                        )}
                         <button
                             onClick={() => setSelectedRequest(null)}
                             className="close"
@@ -136,20 +287,14 @@ const DocumentRequests = () => {
                         <textarea
                             placeholder="Enter rejection reason..."
                             rows="5"
-                            style={{ width: "100%" }}
+                            className="rejection-textarea"
                             value={rejectionReason}
                             onChange={(e) => setRejectionReason(e.target.value)}
                         />
-                        <div className="modal-buttons" style={{ marginTop: "1rem" }}>
+                        <div className="modal-buttons">
                             <button
-                                onClick={() => {
-                                    if (!rejectionReason.trim()) {
-                                        alert("Please provide a reason.");
-                                        return;
-                                    }
-                                    handleDecision("Rejected");
-                                }}
-                                className="reject"
+                                onClick={confirmRejection}
+                                className="confirm-reject"
                             >
                                 Confirm Rejection
                             </button>
@@ -158,7 +303,7 @@ const DocumentRequests = () => {
                                     setShowRejectForm(false);
                                     setRejectionReason("");
                                 }}
-                                className="close"
+                                className="cancel"
                             >
                                 Cancel
                             </button>
@@ -167,6 +312,55 @@ const DocumentRequests = () => {
                 </div>
             )}
 
+            {showAppointmentModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <h3>Schedule Appointment for Document Pickup</h3>
+                        <div className="appointment-form">
+                            <label>
+                                Date:
+                                <input
+                                    type="date"
+                                    value={appointmentDate}
+                                    onChange={(e) => setAppointmentDate(e.target.value)}
+                                    min={new Date().toISOString().split('T')[0]}
+                                />
+                            </label>
+                            <label>
+                                Time:
+                                <input
+                                    type="time"
+                                    value={appointmentTime}
+                                    onChange={(e) => setAppointmentTime(e.target.value)}
+                                    min="08:00"
+                                    max="17:00"
+                                />
+                            </label>
+                            <p className="appointment-note">
+                                Note: Documents can be picked up from 8AM to 5PM at the Barangay Hall
+                            </p>
+                        </div>
+                        <div className="modal-buttons">
+                            <button
+                                onClick={handleApproveWithAppointment}
+                                className="approve"
+                            >
+                                Confirm Appointment
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowAppointmentModal(false);
+                                    setAppointmentDate("");
+                                    setAppointmentTime("");
+                                }}
+                                className="cancel"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -1,108 +1,159 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, Alert, ScrollView, Image } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Picker } from "@react-native-picker/picker";
-import { useRouter } from "expo-router"; // Correct import for useRouter
+import { useRouter } from "expo-router";
 import CustomButton from "@/components/CustomButton";
-import styles from "@/styles/styles";
-import axios from "axios"; // Import axios for HTTP requests
+import { styles } from "@/styles/rd_styles";
+import axios from "axios";
+import { useAuth } from "@clerk/clerk-expo";
+import { LinearGradient } from "expo-linear-gradient";
 
-// Define type for request data
 interface RequestData {
   type: string;
-  document: string;
+  document_type: string;
   reason: string;
-  user: string;
+  clerk_id: string;
+  created_at?: string;
+  status?: string;
 }
 
 const RequestDocumentsScreen = () => {
-  const router = useRouter(); // Add router hook
+  const router = useRouter();
+  const { userId } = useAuth();
 
-  const [selectedDocument, setSelectedDocument] = useState<string>("residency");
+  const [selectedDocumentType, setSelectedDocumentType] = useState<string>("residency");
   const [selectedReason, setSelectedReason] = useState<string>("job");
-  const [loading, setLoading] = useState<boolean>(false); // Loading state for submit button
+  const [loading, setLoading] = useState<boolean>(false);
 
   const handleSubmit = async () => {
-    if (!selectedDocument || !selectedReason) {
-      alert("Please select both document and reason.");
+    if (!selectedDocumentType || !selectedReason) {
+      Alert.alert("Missing Information", "Please select both document and reason.");
       return;
     }
 
-    // Prepare data for submission
+    if (!userId) {
+      Alert.alert("Authentication Error", "User not authenticated. Please log in again.");
+      return;
+    }
+
     const requestData: RequestData = {
       type: "Document Request",
-      document: selectedDocument,
+      document_type: selectedDocumentType,
       reason: selectedReason,
-      user: "User Name", // Replace with actual user data (e.g., from auth context)
+      clerk_id: userId,
     };
 
     try {
-      setLoading(true); // Set loading state when submitting
+      setLoading(true);
+      const response = await axios.post("http://192.168.254.106:5000/api/requests", requestData);
 
-      // Make POST request to backend
-      const response = await axios.post(
-        "http://192.168.254.106:5000/api/requests", // Use your IP address here
-        requestData,
-      );
-
-      console.log("Request submitted successfully:", response.data);
-
-      // Navigate to the details page with the request data using params
+      Alert.alert("Success", "Your request has been submitted successfully!");
       router.push({
-        pathname: "/details", // Make sure this path matches the details screen
-        params: { ...requestData }, // Pass data through params
+        pathname: "/details",
+        params: {
+          ...response.data,
+          type: "Document Request",
+          document_type: selectedDocumentType,
+          reason: selectedReason,
+          clerk_id: userId,
+          created_at: response.data.created_at || new Date().toISOString(),
+          status: "pending"
+        } as never
       });
-
-      alert("Request submitted successfully!");
-    } catch (error) {
-      console.error("Error submitting request:", error);
-      alert("There was an error submitting your request. Please try again.");
+    } catch (error: any) {
+      Alert.alert("Error", error?.response?.data?.message || "There was an error submitting your request.");
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Request a Barangay Document</Text>
+      <SafeAreaView style={styles.container}>
+        <LinearGradient
+            colors={['#f0f9ff', '#e0f2fe', '#bae6fd']}
+            style={styles.gradientBackground}
+        />
+        <View style={styles.floatingDecoration} />
+        <View style={styles.floatingDecoration2} />
 
-      <View style={styles.dropdownContainer}>
-        <Text style={styles.label}>Select Document Type:</Text>
-        <Picker
-          selectedValue={selectedDocument}
-          onValueChange={(itemValue) => setSelectedDocument(itemValue)}
-          style={styles.picker}
+        <ScrollView
+            contentContainerStyle={styles.scrollContainer}
+            showsVerticalScrollIndicator={false}
         >
-          <Picker.Item label="Certificate of Residency" value="residency" />
-          <Picker.Item label="Certificate of Indigency" value="indigency" />
-          <Picker.Item label="Barangay Clearance" value="clearance" />
-        </Picker>
-      </View>
+          <View style={styles.header}>
+            <Text style={styles.heading}>Request Documents</Text>
+            <Text style={styles.subheading}>
+              Select the document you need from our barangay services
+            </Text>
+          </View>
 
-      <View style={styles.dropdownContainer}>
-        <Text style={styles.label}>Reason for Requesting:</Text>
-        <Picker
-          selectedValue={selectedReason}
-          onValueChange={(itemValue) => setSelectedReason(itemValue)}
-          style={styles.picker}
-        >
-          <Picker.Item label="Job Requirement" value="job" />
-          <Picker.Item label="School Requirement" value="school" />
-          <Picker.Item label="Financial Assistance" value="financial" />
-          <Picker.Item label="Medical Assistance" value="medical" />
-          <Picker.Item label="Other" value="other" />
-        </Picker>
-      </View>
+          <View style={styles.iconContainer}>
+            <View style={styles.iconBackground}>
+              <Image
+                  source={require('@/assets/images/doc_icon.png')}
+                  style={styles.icon}
+                  resizeMode="contain"
+              />
+            </View>
+          </View>
 
-      <CustomButton
-        title={loading ? "Submitting..." : "Submit Request"}
-        onPress={handleSubmit}
-        bgVariant="primary"
-        textVariant="default"
-        style={styles.submitButton}
-        disabled={loading} // Disable button while loading
-      />
-    </SafeAreaView>
+          <View style={styles.cardContainer}>
+            <View style={styles.card}>
+              <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.cardGradient}
+              />
+              <Text style={styles.label}>Document Type</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                    selectedValue={selectedDocumentType}
+                    onValueChange={setSelectedDocumentType}
+                    style={styles.picker}
+                    dropdownIconColor="#64748b"
+                >
+                  <Picker.Item label="Certificate of Residency" value="residency" />
+                  <Picker.Item label="Certificate of Indigency" value="indigency" />
+                  <Picker.Item label="Barangay Clearance" value="clearance" />
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.cardContainer}>
+            <View style={styles.card}>
+              <LinearGradient
+                  colors={['#3b82f6', '#2563eb']}
+                  style={styles.cardGradient}
+              />
+              <Text style={styles.label}>Reason for Request</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                    selectedValue={selectedReason}
+                    onValueChange={setSelectedReason}
+                    style={styles.picker}
+                    dropdownIconColor="#64748b"
+                >
+                  <Picker.Item label="Job Requirement" value="job" />
+                  <Picker.Item label="School Requirement" value="school" />
+                  <Picker.Item label="Financial Assistance" value="financial" />
+                  <Picker.Item label="Medical Assistance" value="medical" />
+                  <Picker.Item label="Other Purpose" value="other" />
+                </Picker>
+              </View>
+            </View>
+          </View>
+
+          <CustomButton
+              title={loading ? "Processing..." : "Submit Request"}
+              onPress={handleSubmit}
+              bgVariant="gradient"
+              textVariant="light"
+              style={styles.submitButton}
+              disabled={loading}
+          />
+        </ScrollView>
+      </SafeAreaView>
   );
 };
 

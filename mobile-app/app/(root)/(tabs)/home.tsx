@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Image, Dimensions } from "react-native";
+import { View, Image, Dimensions, ImageBackground } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "@/constants"; // Make sure this contains multiple images
 import Animated, {
@@ -77,32 +77,48 @@ export default function Page() {
       <View style={styles.buttonContainer}>
         {/* Top Row - Button 1 and 2 */}
         <View style={styles.topRow}>
-          <CustomButton
-            title="Button 1"
-            onPress={() => router.push("/create-id")}
-            bgVariant="primary"
-            textVariant="default"
-            className="rounded-lg"
-            style={styles.bigButton}
-          />
-          <CustomButton
-            title="Button 2"
-            onPress={() => router.push("/request-documents")}
-            bgVariant="secondary"
-            textVariant="default"
-            className="rounded-lg"
-            style={styles.bigButton}
-          />
+          <ImageBackground
+              source={images.id}
+              style={styles.bigButton} // keep same style
+              imageStyle={{ borderRadius: 12 }} // optional, for rounded corners
+          >
+            <CustomButton
+                title="" // remove text
+                onPress={() => router.push("/create-id")}
+                bgVariant="transparent" // no background color
+                textVariant="default"
+                className="rounded-lg"
+                style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+            />
+          </ImageBackground>
+          <ImageBackground
+              source={images.request}
+              style={styles.bigButton} // keep same style
+              imageStyle={{ borderRadius: 12 }} // optional, for rounded corners
+          >
+            <CustomButton
+                title="" // remove text
+                onPress={() => router.push("/request-documents")}
+                bgVariant="transparent" // no background color
+                textVariant="default"
+                className="rounded-lg"
+                style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+            />
+          </ImageBackground>
         </View>
-
-        {/* Bottom - Button 3 */}
-        <CustomButton
-          title="Button 3"
-          onPress={() => router.push("/incident-report")}
-          bgVariant="success"
-          textVariant="default"
-          style={styles.rectButton}
-        />
+        <ImageBackground
+            source={images.incident}
+            style={styles.rectButton} // keep same size/position
+            imageStyle={{ borderRadius: 12 }} // optional: match your button styling
+        >
+          <CustomButton
+              title="" // remove text since it's in the image
+              onPress={() => router.push("/incident-report")}
+              bgVariant="transparent"
+              textVariant="default"
+              style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
+          />
+        </ImageBackground>
       </View>
     </SafeAreaView>
   );
