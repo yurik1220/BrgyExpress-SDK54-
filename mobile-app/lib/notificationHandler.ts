@@ -51,9 +51,10 @@ export const registerForPushNotifications = async () => {
 /**
  * Save push token to backend
  */
+// Replace the hardcoded URL in savePushTokenToBackend
 export const savePushTokenToBackend = async (userId: string, token: string) => {
     try {
-        const response = await axios.post('http://192.168.254.106:5000/api/save-push-token', {
+        const response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/save-push-token`, {
             userId,
             pushToken: token
         });

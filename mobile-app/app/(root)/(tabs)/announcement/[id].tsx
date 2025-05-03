@@ -36,7 +36,7 @@ export default function AnnouncementDetail() {
     const [refreshing, setRefreshing] = useState(false);
     const announcementId = Array.isArray(id) ? id[0] : id;
 
-    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.254.106:5000';
+    const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
     // Fetch announcement
     const {

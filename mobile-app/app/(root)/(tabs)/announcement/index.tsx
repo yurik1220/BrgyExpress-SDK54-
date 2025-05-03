@@ -24,7 +24,8 @@ export default function AnnouncementsList() {
     const { data: announcements, isLoading, refetch } = useQuery({
         queryKey: ['announcements'],
         queryFn: async () => {
-            const res = await axios.get('http://192.168.254.106:5000/api/announcements');
+            // Replace the hardcoded URL in useQuery
+            const res = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/announcements`);
             return res.data;
         }
     });

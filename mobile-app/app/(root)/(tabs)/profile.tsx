@@ -43,7 +43,7 @@ const Profile = () => {
                     throw new Error('User not authenticated');
                 }
 
-                const response = await axios.get(`http://192.168.254.106:5000/api/users/${userId}`);
+                const response = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/users/${userId}`);
                 setUser(response.data);
                 setTempName(response.data.name);
             } catch (err) {
@@ -83,7 +83,7 @@ const Profile = () => {
             }
 
             const response = await axios.patch(
-                `http://192.168.254.106:5000/api/users/${userId}`,
+                `${process.env.EXPO_PUBLIC_API_URL}/api/users/${userId}`,
                 { name: tempName }
             );
 

@@ -26,11 +26,11 @@ type Media = {
 } | null;
 
 const polygonCoordinates: [number, number][] = [
-    [120.9883678, 14.7157794],
-    [120.9890223, 14.7149233],
-    [120.9902561, 14.7154317],
-    [120.9898108, 14.716319],
-    [120.9883678, 14.7157794],
+    [121.0075039,14.7452766],
+    [121.0075468,14.7447578],
+    [121.008786,14.7448771],
+    [121.0087216,14.745427],
+    [121.0075039,14.7452766],
 ];
 
 function isPointInPolygon(
@@ -200,7 +200,7 @@ const IncidentReportScreen = () => {
             }
 
             const response = await axios.post(
-                "http://192.168.254.106:5000/api/requests",
+                `${process.env.EXPO_PUBLIC_API_URL}/api/requests`,
                 formData,
                 {
                     headers: {
