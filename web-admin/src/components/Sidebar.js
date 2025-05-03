@@ -22,6 +22,11 @@ const Sidebar = () => {
                         Create ID Requests
                     </NavLink>
                 </li>
+                <li>
+                    <NavLink to="/announcement-page" className={({ isActive }) => isActive ? 'active' : ''}>
+                        Announcement Page
+                    </NavLink>
+                </li>
             </ul>
         </div>
     );

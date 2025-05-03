@@ -80,6 +80,15 @@ export const styles = StyleSheet.create({
         color: '#1E88E5',
         textDecorationLine: 'underline',
     },
+    backButton: {
+        position: 'absolute',
+        top: 16,
+        left: 16,
+        zIndex: 1,
+        padding: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+        borderRadius: 20,
+    }
 });
 
 export const detailRowStyles = {

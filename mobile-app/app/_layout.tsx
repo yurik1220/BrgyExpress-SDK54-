@@ -8,6 +8,11 @@ import { tokenCache } from "@/lib/auth";
 import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
 import { LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+
+// Initialize React Query client
+const queryClient = new QueryClient();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -15,7 +20,7 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
 
 if (!publishableKey) {
   throw new Error(
-    "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env",
+      "Missing Publishable Key. Please set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in your .env",
   );
 }
 
@@ -42,17 +47,19 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-        <ClerkLoaded>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            <Stack.Screen name="(root)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
-        </ClerkLoaded>
-      </ClerkProvider>
-    </GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+          <QueryClientProvider client={queryClient}>
+            <ClerkLoaded>
+              <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+                <Stack.Screen name="(root)" options={{ headerShown: false }} />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+            </ClerkLoaded>
+          </QueryClientProvider>
+        </ClerkProvider>
+      </GestureHandlerRootView>
   );
 }
