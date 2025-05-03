@@ -60,7 +60,7 @@ const Activity = () => {
 
     const fetchActivity = async () => {
         try {
-            const response = await axios.get(`http://192.168.254.106:5000/api/requests/${userId}`);
+            const response = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}`);
 
             const sortedData = response.data.sort((a: Transaction, b: Transaction) => {
                 const dateA = a.created_at ? new Date(a.created_at) : new Date(0);

@@ -8,7 +8,7 @@ const RequestList = () => {
 
     useEffect(() => {
         axios
-            .get("http://192.168.254.106:5000/api/requests")
+            .get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests`)
             .then((res) => {
                 // Handle different possible structures of the response
                 if (Array.isArray(res.data)) {

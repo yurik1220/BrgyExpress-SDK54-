@@ -201,7 +201,7 @@ const DetailsScreen = () => {
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Attached Media</Text>
                     <Image
-                        source={{ uri: `http://192.168.254.106:5000${media_url as string}` }}
+                        source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${media_url as string}` }}
                         style={styles.media}
                         resizeMode="contain"
                     />

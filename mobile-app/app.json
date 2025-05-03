@@ -33,7 +33,14 @@
         {
           "origin": "https://uber.dev/"
         }
-
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "experiments": {

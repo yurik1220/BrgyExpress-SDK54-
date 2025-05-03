@@ -59,7 +59,8 @@ const CreateIDScreen = () => {
     try {
       setLoading(true);
       console.log("Request Data:", requestData);
-      const response = await axios.post("http://192.168.254.106:5000/api/requests", requestData);
+      // Replace the hardcoded URL in handleSubmit
+      const response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/requests`, requestData);
 
       // Replace the current screen with details and prevent going back to form
       router.replace({
