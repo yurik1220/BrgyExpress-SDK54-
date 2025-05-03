@@ -3,14 +3,14 @@ import axios from "axios";
 import "../styles/DocumentRequests.css";
 
 const IncidentReports = () => {
-    const [incidents, setIncidents] = useState([]);
-    const [history, setHistory] = useState([]);
+    const [pendingIncidents, setPendingIncidents] = useState([]);
+    const [activeIncidents, setActiveIncidents] = useState([]);
+    const [closedIncidents, setClosedIncidents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedIncident, setSelectedIncident] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
     const [mapUrl, setMapUrl] = useState("");
-    const [historyFilter, setHistoryFilter] = useState("all");
 
     useEffect(() => {
         const fetchIncidentReports = async () => {
@@ -18,12 +18,10 @@ const IncidentReports = () => {
                 const response = await axios.get("http://localhost:5000/api/requests");
                 const allIncidents = response.data.filter(req => req.type === "Incident Report");
 
-                // Separate pending and resolved incidents
-                const pending = allIncidents.filter(i => !i.status || i.status === 'pending');
-                const resolved = allIncidents.filter(i => i.status && i.status !== 'pending');
-
-                setIncidents(pending);
-                setHistory(resolved);
+                // Separate incidents by status
+                setPendingIncidents(allIncidents.filter(i => !i.status || i.status === 'pending'));
+                setActiveIncidents(allIncidents.filter(i => i.status === 'in_progress'));
+                setClosedIncidents(allIncidents.filter(i => i.status === 'closed'));
             } catch (error) {
                 setError("Error fetching incident reports");
                 console.error("Fetch error:", error);
@@ -34,18 +32,17 @@ const IncidentReports = () => {
         fetchIncidentReports();
     }, []);
 
-    const handleDecision = async (status) => {
+    const handleStatusChange = async (newStatus) => {
         if (!selectedIncident) return;
 
         try {
-            // Convert status to lowercase to match backend expectations
-            const normalizedStatus = status.toLowerCase();
+            const apiStatus = newStatus.toLowerCase().replace(' ', '_');
 
             const response = await axios.patch(
                 `http://localhost:5000/api/incidents/${selectedIncident.id}`,
                 {
-                    status: normalizedStatus,
-                    resolved_at: new Date().toISOString()
+                    status: apiStatus,
+                    resolved_at: apiStatus === 'closed' ? new Date().toISOString() : null
                 },
                 {
                     headers: {
@@ -54,27 +51,22 @@ const IncidentReports = () => {
                 }
             );
 
-            // Verify the response
             if (response.data && response.data.id) {
-                setIncidents(prev => prev.filter(i => i.id !== selectedIncident.id));
-                setHistory(prev => [response.data, ...prev]);
+                // Update the appropriate state based on the status change
+                if (apiStatus === 'in_progress') {
+                    // Move from pending to active
+                    setPendingIncidents(prev => prev.filter(i => i.id !== selectedIncident.id));
+                    setActiveIncidents(prev => [...prev, response.data]);
+                } else if (apiStatus === 'closed') {
+                    // Move from active to closed
+                    setActiveIncidents(prev => prev.filter(i => i.id !== selectedIncident.id));
+                    setClosedIncidents(prev => [response.data, ...prev]);
+                }
                 setSelectedIncident(null);
-            } else {
-                throw new Error("Invalid response from server");
             }
         } catch (error) {
             console.error("Update error:", error);
-
-            let errorMessage = "Failed to update incident status";
-            if (error.response) {
-                // Server responded with error status
-                errorMessage = error.response.data?.error || errorMessage;
-            } else if (error.request) {
-                // Request was made but no response
-                errorMessage = "No response from server. Please check your connection.";
-            }
-
-            alert(errorMessage);
+            alert("Failed to update incident status");
         }
     };
 
@@ -85,12 +77,6 @@ const IncidentReports = () => {
             setMapUrl(`https://www.google.com/maps?q=${latitude},${longitude}`);
         }
     }, [selectedIncident]);
-
-    // Filter history based on selected filter
-    const filteredHistory = history.filter(incident => {
-        if (historyFilter === "all") return true;
-        return incident.status.toLowerCase() === historyFilter.toLowerCase();
-    });
 
     if (loading) return <p>Loading incident reports...</p>;
     if (error) return <p>{error}</p>;
@@ -107,21 +93,27 @@ const IncidentReports = () => {
                     Pending Reports
                 </button>
                 <button
-                    className={activeTab === "history" ? "active-tab" : ""}
-                    onClick={() => setActiveTab("history")}
+                    className={activeTab === "active" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("active")}
                 >
-                    History Log
+                    Active Incidents
+                </button>
+                <button
+                    className={activeTab === "closed" ? "active-tab" : ""}
+                    onClick={() => setActiveTab("closed")}
+                >
+                    Closed Incidents
                 </button>
             </div>
 
             {activeTab === "pending" && (
                 <>
-                    {incidents.length > 0 ? (
+                    {pendingIncidents.length > 0 ? (
                         <ul className="request-list">
-                            {incidents.map((incident) => (
+                            {pendingIncidents.map((incident) => (
                                 <li
                                     key={incident.id}
-                                    className="request-item"
+                                    className="request-item pending"
                                     onClick={() => setSelectedIncident(incident)}
                                 >
                                     <p>
@@ -138,51 +130,55 @@ const IncidentReports = () => {
                 </>
             )}
 
-            {activeTab === "history" && (
+            {activeTab === "active" && (
                 <>
-                    <div className="history-filters">
-                        <button
-                            className={historyFilter === "all" ? "active-filter" : ""}
-                            onClick={() => setHistoryFilter("all")}
-                        >
-                            All
-                        </button>
-                        <button
-                            className={historyFilter === "approved" ? "active-filter" : ""}
-                            onClick={() => setHistoryFilter("approved")}
-                        >
-                            Approved
-                        </button>
-                        <button
-                            className={historyFilter === "rejected" ? "active-filter" : ""}
-                            onClick={() => setHistoryFilter("rejected")}
-                        >
-                            Rejected
-                        </button>
-                    </div>
-
-                    {filteredHistory.length > 0 ? (
+                    {activeIncidents.length > 0 ? (
                         <ul className="request-list">
-                            {filteredHistory.map((incident) => (
+                            {activeIncidents.map((incident) => (
                                 <li
                                     key={incident.id}
-                                    className={`request-item ${incident.status.toLowerCase()}`}
+                                    className="request-item in-progress"
                                     onClick={() => setSelectedIncident(incident)}
                                 >
                                     <p>
-                                        <strong>{incident.title}</strong> (Clerk ID: {incident.clerk_id}) —
-                                        <em> {incident.status}</em>
+                                        <strong>{incident.title}</strong> reported by Clerk ID: {incident.clerk_id}
                                         <br />
                                         <small>
-                                            Reported: {new Date(incident.created_at).toLocaleString()} |
-                                            Resolved: {new Date(incident.resolved_at).toLocaleString()}
+                                            {new Date(incident.created_at).toLocaleString()} - In Progress
                                         </small>
                                     </p>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p>No {historyFilter === "all" ? "" : historyFilter} incidents in history.</p>
+                        <p>No active incidents.</p>
+                    )}
+                </>
+            )}
+
+            {activeTab === "closed" && (
+                <>
+                    {closedIncidents.length > 0 ? (
+                        <ul className="request-list">
+                            {closedIncidents.map((incident) => (
+                                <li
+                                    key={incident.id}
+                                    className="request-item closed"
+                                    onClick={() => setSelectedIncident(incident)}
+                                >
+                                    <p>
+                                        <strong>{incident.title}</strong> (Clerk ID: {incident.clerk_id})
+                                        <br />
+                                        <small>
+                                            Reported: {new Date(incident.created_at).toLocaleString()} |
+                                            Closed: {new Date(incident.resolved_at).toLocaleString()}
+                                        </small>
+                                    </p>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No closed incidents.</p>
                     )}
                 </>
             )}
@@ -195,6 +191,7 @@ const IncidentReports = () => {
                         <p><strong>Description:</strong> {selectedIncident.description}</p>
                         <p><strong>Reported by Clerk ID:</strong> {selectedIncident.clerk_id}</p>
                         <p><strong>Date Reported:</strong> {new Date(selectedIncident.created_at).toLocaleString()}</p>
+                        <p><strong>Status:</strong> {selectedIncident.status ? selectedIncident.status.replace('_', ' ') : 'pending'}</p>
 
                         {selectedIncident.location && (
                             <p>
@@ -218,17 +215,22 @@ const IncidentReports = () => {
 
                         {(!selectedIncident.status || selectedIncident.status === 'pending') && (
                             <div className="modal-buttons">
-                                <button onClick={() => handleDecision("Approved")} className="approve">
-                                    Approve
+                                <button onClick={() => handleStatusChange("In Progress")} className="approve">
+                                    Accept Report
                                 </button>
-                                <button onClick={() => handleDecision("Rejected")} className="reject">
-                                    Reject
+                            </div>
+                        )}
+
+                        {selectedIncident.status === 'in_progress' && (
+                            <div className="modal-buttons">
+                                <button onClick={() => handleStatusChange("Closed")} className="reject">
+                                    Close Incident
                                 </button>
                             </div>
                         )}
 
                         <button onClick={() => setSelectedIncident(null)} className="close">
-                            Close
+                            Close Details
                         </button>
                     </div>
                 </div>

@@ -1,6 +1,6 @@
 import React from "react";
-import { View, Text, Image, ScrollView, Linking } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { View, Text, Image, ScrollView, Linking, TouchableOpacity } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { AntDesign } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { styles, detailRowStyles } from "@/styles/details_style";
@@ -35,6 +35,10 @@ const DetailRow: React.FC<DetailRowProps> = ({ icon, label, value, isWarning = f
 
 const DetailsScreen = () => {
   const params = useLocalSearchParams();
+  const router = useRouter();
+
+  // Check if we're coming from a successful submission (has 'fromSubmission' param)
+  const fromSubmission = params.fromSubmission === 'true';
 
   const {
     type,
@@ -84,8 +88,26 @@ const DetailsScreen = () => {
     }
   };
 
+  const handleBackPress = () => {
+    if (fromSubmission) {
+      // If coming from submission, go back to home
+      router.replace('/home');
+    } else {
+      // Otherwise, go back one page
+      router.back();
+    }
+  };
+
   return (
       <ScrollView contentContainerStyle={styles.container}>
+        {/* Back Button */}
+        <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBackPress}
+        >
+          <AntDesign name="arrowleft" size={24} color="#333" />
+        </TouchableOpacity>
+
         <View style={styles.header}>
           <Text style={styles.title}>
             {type === 'Document Request' && '📄 Document Request'}
@@ -102,7 +124,6 @@ const DetailsScreen = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Request Information</Text>
-
           <DetailRow icon="user" label="Submitted by" value={clerk_id as string} />
           <DetailRow icon="calendar" label="Date Submitted" value={formattedCreatedAt} />
           {status && <DetailRow icon="clock" label="Date Resolved" value={formattedResolvedAt} />}

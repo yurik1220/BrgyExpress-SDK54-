@@ -48,8 +48,8 @@ const RequestDocumentsScreen = () => {
       setLoading(true);
       const response = await axios.post("http://192.168.254.106:5000/api/requests", requestData);
 
-      Alert.alert("Success", "Your request has been submitted successfully!");
-      router.push({
+      // Replace current screen with details and prevent going back to form
+      router.replace({
         pathname: "/details",
         params: {
           ...response.data,
@@ -58,9 +58,12 @@ const RequestDocumentsScreen = () => {
           reason: selectedReason,
           clerk_id: userId,
           created_at: response.data.created_at || new Date().toISOString(),
-          status: "pending"
+          status: "pending",
+          fromSubmission: 'true' // Add this flag
         } as never
       });
+
+      // Removed the success alert since we're navigating directly to details
     } catch (error: any) {
       Alert.alert("Error", error?.response?.data?.message || "There was an error submitting your request.");
     } finally {

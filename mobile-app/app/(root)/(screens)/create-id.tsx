@@ -59,9 +59,18 @@ const CreateIDScreen = () => {
     try {
       setLoading(true);
       console.log("Request Data:", requestData);
-      await axios.post("http://192.168.254.106:5000/api/requests", requestData);
-      router.push({ pathname: "/details", params: { ...requestData } });
-      Alert.alert("Success", "Barangay ID request submitted successfully!");
+      const response = await axios.post("http://192.168.254.106:5000/api/requests", requestData);
+
+      // Replace the current screen with details and prevent going back to form
+      router.replace({
+        pathname: "/details",
+        params: {
+          ...response.data,  // Use the response data instead of requestData
+          fromSubmission: 'true' // Add this flag
+        },
+      });
+
+      // Removed the success alert since we're navigating directly to details
     } catch (error) {
       console.error("Submission error:", error);
       Alert.alert(

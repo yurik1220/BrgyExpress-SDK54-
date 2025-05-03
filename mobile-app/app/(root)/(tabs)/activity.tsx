@@ -1,4 +1,4 @@
-import { View, Text, ActivityIndicator, TouchableOpacity, SectionList, RefreshControl } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, SectionList, RefreshControl, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect, useState } from "react";
 import axios from "axios";
@@ -8,6 +8,8 @@ import { useRouter } from "expo-router";
 import { useCallback } from "react";
 import { styles, getStatusStyle } from "@/styles/activity_styles";
 import { MaterialIcons } from '@expo/vector-icons';
+import { initNotificationSystem } from '@/lib/notificationHandler';
+import { useNavigation } from '@react-navigation/native';
 
 interface Transaction {
     id: string;
@@ -34,6 +36,27 @@ const Activity = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const router = useRouter();
+    const navigation = useNavigation();
+
+    useEffect(() => {
+        let cleanup: (() => void) | undefined;
+
+        const setupNotifications = async () => {
+            try {
+                if (userId) {
+                    cleanup = await initNotificationSystem(userId, navigation);
+                }
+            } catch (error) {
+                console.error('Notification setup error:', error);
+            }
+        };
+
+        setupNotifications();
+
+        return () => {
+            cleanup?.();
+        };
+    }, [userId, navigation]);
 
     const fetchActivity = async () => {
         try {
@@ -174,51 +197,61 @@ const Activity = () => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <Text style={styles.header}>Your Activity</Text>
+        <SafeAreaView style={[styles.container, { flex: 1 }]} edges={['top', 'right', 'left']}>
+            <View style={[styles.contentContainer, {
+                flex: 1,
+                paddingBottom: Platform.OS === 'ios' ? 30 : 60 // Adjust this value based on your tab bar height
+            }]}>
+                <Text style={styles.header}>Your Activity</Text>
 
-            {/* Status Filter Tabs */}
-            <View style={styles.filterContainer}>
-                <TouchableOpacity
-                    style={[styles.filterButton, statusFilter === 'all' && styles.activeFilter]}
-                    onPress={() => setStatusFilter('all')}
-                >
-                    <Text style={[styles.filterText, statusFilter === 'all' && styles.activeFilterText]}>All</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.filterButton, statusFilter === 'pending' && styles.activeFilter]}
-                    onPress={() => setStatusFilter('pending')}
-                >
-                    <Text style={[styles.filterText, statusFilter === 'pending' && styles.activeFilterText]}>Pending</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.filterButton, statusFilter === 'completed' && styles.activeFilter]}
-                    onPress={() => setStatusFilter('completed')}
-                >
-                    <Text style={[styles.filterText, statusFilter === 'completed' && styles.activeFilterText]}>Completed</Text>
-                </TouchableOpacity>
+                {/* Status Filter Tabs */}
+                <View style={styles.filterContainer}>
+                    <TouchableOpacity
+                        style={[styles.filterButton, statusFilter === 'all' && styles.activeFilter]}
+                        onPress={() => setStatusFilter('all')}
+                    >
+                        <Text style={[styles.filterText, statusFilter === 'all' && styles.activeFilterText]}>All</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterButton, statusFilter === 'pending' && styles.activeFilter]}
+                        onPress={() => setStatusFilter('pending')}
+                    >
+                        <Text style={[styles.filterText, statusFilter === 'pending' && styles.activeFilterText]}>Pending</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.filterButton, statusFilter === 'completed' && styles.activeFilter]}
+                        onPress={() => setStatusFilter('completed')}
+                    >
+                        <Text style={[styles.filterText, statusFilter === 'completed' && styles.activeFilterText]}>Completed</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {loading ? (
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                        <ActivityIndicator size="large" />
+                    </View>
+                ) : (
+                    <SectionList
+                        sections={sectionData}
+                        keyExtractor={(item) => `type-${item.type}-id-${item.id}`}
+                        renderItem={renderTransaction}
+                        renderSectionHeader={renderSectionHeader}
+                        contentContainerStyle={[
+                            styles.sectionListContent,
+                            { paddingBottom: 35 } // Extra padding at the bottom
+                        ]}
+                        stickySectionHeadersEnabled={false}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={refreshing}
+                                onRefresh={onRefresh}
+                                colors={['#3498db']}
+                                tintColor={'#3498db'}
+                            />
+                        }
+                    />
+                )}
             </View>
-
-            {loading ? (
-                <ActivityIndicator size="large" />
-            ) : (
-                <SectionList
-                    sections={sectionData}
-                    keyExtractor={(item) => `type-${item.type}-id-${item.id}`}
-                    renderItem={renderTransaction}
-                    renderSectionHeader={renderSectionHeader}
-                    contentContainerStyle={styles.sectionListContent}
-                    stickySectionHeadersEnabled={false}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            colors={['#3498db']}
-                            tintColor={'#3498db'}
-                        />
-                    }
-                />
-            )}
         </SafeAreaView>
     );
 };
