@@ -14,7 +14,7 @@ const SignUp = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const [form, setForm] = useState({
-    name: "", // Added name field
+    name: "",
     phoneNumber: "",
     password: "",
   });
@@ -54,7 +54,7 @@ const SignUp = () => {
       });
 
       if (result.status === "complete" && result.createdSessionId) {
-        // 4. Send user data to your API
+        // 4. Send user data to the API
         await fetchAPI("/(api)/user", {
           method: "POST",
           body: JSON.stringify({
