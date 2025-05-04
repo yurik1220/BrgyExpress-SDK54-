@@ -81,7 +81,6 @@ const SignIn = () => {
                 className="mt-6"
             />
 
-            {/* You can keep OAuth or remove if not needed for phone login */}
             <OAuth />
 
             <Link

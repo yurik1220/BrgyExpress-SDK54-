@@ -1,0 +1,263 @@
+/* === Layout Containers === */
+.request-list,
+.history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.content-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.content-tabs button {
+    padding: 0.5rem 1.5rem;
+    border: none;
+    background: #e0e0e0;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.content-tabs button.active-tab {
+    background-color: #3498db;
+    color: #fff;
+}
+
+/* === Sticky Filter Bar === */
+.history-filters-container {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    padding: 0.75rem 1rem;
+    margin: 0;
+    border-bottom: 1px solid #e6ecf0;
+}
+
+.history-filters {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.history-filters button {
+    padding: 0.5rem 1.25rem;
+    border: none;
+    border-radius: 6px;
+    background: #f0f0f0;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.history-filters button.active-filter {
+    background: #3498db;
+    color: white;
+}
+
+/* === Request Cards === */
+.request-card {
+    background: white;
+    border-left: 5px solid #FFD700;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.request-card:hover {
+    transform: translateY(-3px);
+}
+
+.request-card.approved {
+    border-left-color: #2ecc71;
+}
+
+.request-card.rejected {
+    border-left-color: #e74c3c;
+}
+
+.request-card p {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.request-card small {
+    display: block;
+    color: #888;
+    font-size: 0.875rem;
+}
+
+/* === Empty States === */
+.no-requests-message,
+.no-history-message {
+    text-align: center;
+    padding: 2rem;
+    color: #888;
+    font-style: italic;
+}
+
+/* === Modal Styles === */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: white;
+    border-radius: 10px;
+    padding: 2rem;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.modal h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.modal-content p {
+    margin: 0.75rem 0;
+    font-size: 1rem;
+}
+
+.modal-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.modal-buttons button {
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button.approve {
+    background: #2ecc71;
+    color: white;
+}
+button.approve:hover {
+    background: #27ae60;
+}
+
+button.reject,
+button.confirm-reject {
+    background: #e74c3c;
+    color: white;
+}
+button.reject:hover,
+button.confirm-reject:hover {
+    background: #c0392b;
+}
+
+button.cancel,
+button.close {
+    background: #95a5a6;
+    color: white;
+}
+button.cancel:hover,
+button.close:hover {
+    background: #7f8c8d;
+}
+button.close {
+    width: 100%;
+}
+
+/* === Rejection Text Area === */
+.rejection-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+    resize: vertical;
+    margin-top: 0.5rem;
+}
+
+/* === Appointment Form === */
+.appointment-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.appointment-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.appointment-form input {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-family: 'Poppins', sans-serif;
+}
+
+.appointment-note {
+    font-size: 0.875rem;
+    color: #666;
+    font-style: italic;
+}
+.tabs-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    margin-left: 40px;
+}
+.tab-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px; /* Space between tabs and History Log */
+}
+
+.status-dropdown-container {
+    flex-shrink: 0;
+}
+
+.status-dropdown {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    background-color: #fff;
+    cursor: pointer;
+    margin-right: 60px;
+}
+
+
+/* === Responsive === */
+@media (max-width: 768px) {
+    .history-filters {
+        margin: 0 1rem;
+    }
+    .modal {
+        padding: 1.5rem;
+    }
+}

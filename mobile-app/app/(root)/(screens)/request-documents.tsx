@@ -9,6 +9,7 @@ import axios from "axios";
 import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 
+// Define the structure of the data to be submitted
 interface RequestData {
   type: string;
   document_type: string;
@@ -18,25 +19,35 @@ interface RequestData {
   status?: string;
 }
 
+// Component for handling document request form
 const RequestDocumentsScreen = () => {
-  const router = useRouter();
-  const { userId } = useAuth();
+  const router = useRouter(); // For navigating between screens
+  const { userId } = useAuth(); // Get logged-in user's ID
 
+  // Store selected document type
   const [selectedDocumentType, setSelectedDocumentType] = useState<string>("residency");
+
+  // Store selected reason for the request
   const [selectedReason, setSelectedReason] = useState<string>("job");
+
+  // Tracks loading state during form submission
   const [loading, setLoading] = useState<boolean>(false);
 
+  // Handles form submission logic
   const handleSubmit = async () => {
+    // Check if required selections are made
     if (!selectedDocumentType || !selectedReason) {
       Alert.alert("Missing Information", "Please select both document and reason.");
       return;
     }
 
+    // Check if user is authenticated
     if (!userId) {
       Alert.alert("Authentication Error", "User not authenticated. Please log in again.");
       return;
     }
 
+    // Create request payload
     const requestData: RequestData = {
       type: "Document Request",
       document_type: selectedDocumentType,
@@ -45,11 +56,12 @@ const RequestDocumentsScreen = () => {
     };
 
     try {
-      setLoading(true);
-      // Replace the hardcoded URL in handleSubmit
+      setLoading(true); // Set loading state while request is processing
+
+      // Send request data to backend API
       const response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/requests`, requestData);
 
-      // Replace current screen with details and prevent going back to form
+      // Navigate to details screen with response data and submission flag
       router.replace({
         pathname: "/details",
         params: {
@@ -60,20 +72,23 @@ const RequestDocumentsScreen = () => {
           clerk_id: userId,
           created_at: response.data.created_at || new Date().toISOString(),
           status: "pending",
-          fromSubmission: 'true' // Add this flag
+          fromSubmission: 'true' // Used to indicate navigation from submission
         } as never
       });
 
-      // Removed the success alert since we're navigating directly to details
+      // No alert shown because navigation replaces screen
     } catch (error: any) {
+      // Display error if submission fails
       Alert.alert("Error", error?.response?.data?.message || "There was an error submitting your request.");
     } finally {
-      setLoading(false);
+      setLoading(false); // Reset loading state after request is handled
     }
   };
 
   return (
+      // Main safe area container
       <SafeAreaView style={styles.container}>
+        {/* Background gradient decoration */}
         <LinearGradient
             colors={['#f0f9ff', '#e0f2fe', '#bae6fd']}
             style={styles.gradientBackground}
@@ -81,10 +96,12 @@ const RequestDocumentsScreen = () => {
         <View style={styles.floatingDecoration} />
         <View style={styles.floatingDecoration2} />
 
+        {/* Scrollable form content */}
         <ScrollView
             contentContainerStyle={styles.scrollContainer}
             showsVerticalScrollIndicator={false}
         >
+          {/* Header text */}
           <View style={styles.header}>
             <Text style={styles.heading}>Request Documents</Text>
             <Text style={styles.subheading}>
@@ -92,6 +109,7 @@ const RequestDocumentsScreen = () => {
             </Text>
           </View>
 
+          {/* Icon graphic section */}
           <View style={styles.iconContainer}>
             <View style={styles.iconBackground}>
               <Image
@@ -102,6 +120,7 @@ const RequestDocumentsScreen = () => {
             </View>
           </View>
 
+          {/* Card for document type selection */}
           <View style={styles.cardContainer}>
             <View style={styles.card}>
               <LinearGradient
@@ -124,6 +143,7 @@ const RequestDocumentsScreen = () => {
             </View>
           </View>
 
+          {/* Card for reason selection */}
           <View style={styles.cardContainer}>
             <View style={styles.card}>
               <LinearGradient
@@ -148,6 +168,7 @@ const RequestDocumentsScreen = () => {
             </View>
           </View>
 
+          {/* Submit button */}
           <CustomButton
               title={loading ? "Processing..." : "Submit Request"}
               onPress={handleSubmit}
