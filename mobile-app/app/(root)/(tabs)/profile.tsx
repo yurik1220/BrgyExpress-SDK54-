@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,15 +7,28 @@ import {
     ActivityIndicator,
     Alert,
     Modal,
-    TextInput
+    TextInput,
+    Image,
+    Dimensions,
+    NativeScrollEvent,
+    NativeSyntheticEvent
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/clerk-expo';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons, Feather, Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
-import { styles, getStatusStyle } from '@/styles/profile_styles';
+import Animated, { 
+    FadeInDown, 
+    FadeIn, 
+    useAnimatedStyle, 
+    withSpring,
+    interpolate,
+    useSharedValue
+} from 'react-native-reanimated';
+import { styles } from '@/styles/profile_styles';
+import { useTabBarVisibility } from './_layout';
 
 interface UserData {
     id: string;
@@ -26,15 +39,20 @@ interface UserData {
     member_since: string;
 }
 
+const { width, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const Profile = () => {
     const router = useRouter();
     const { signOut, userId } = useAuth();
+    const { setIsTabBarVisible } = useTabBarVisibility();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
+    const lastScrollY = useRef(0);
+    const scrollY = useSharedValue(0);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -96,6 +114,20 @@ const Profile = () => {
         }
     };
 
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        scrollY.value = currentScrollY;
+        
+        // Show tab bar when scrolling up, hide when scrolling down
+        if (currentScrollY < lastScrollY.current) {
+            setIsTabBarVisible(true);
+        } else if (currentScrollY > 50) { // Reduced threshold to make it more sensitive
+            setIsTabBarVisible(false);
+        }
+        
+        lastScrollY.current = currentScrollY;
+    };
+
     if (loading) {
         return (
             <SafeAreaView style={[styles.container, styles.loadingContainer]}>
@@ -133,11 +165,25 @@ const Profile = () => {
         <SafeAreaView style={styles.container} edges={['top']}>
             <LinearGradient
                 colors={['#e0f2fe', '#bae6fd', '#7dd3fc']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={styles.gradientBackground}
             />
 
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <View style={styles.header}>
+            <ScrollView 
+                contentContainerStyle={[
+                    styles.scrollContainer,
+                    { minHeight: SCREEN_HEIGHT + 200 } // Ensure content is taller than screen
+                ]}
+                showsVerticalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                bounces={true}
+            >
+                <Animated.View 
+                    entering={FadeInDown.duration(600).springify()}
+                    style={styles.header}
+                >
                     <Text style={styles.headerTitle}>Profile</Text>
                     <TouchableOpacity
                         style={styles.editButton}
@@ -145,104 +191,99 @@ const Profile = () => {
                     >
                         <Feather name="edit" size={24} color="#3b82f6" />
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
 
-                <View style={styles.profileContainer}>
+                <Animated.View 
+                    entering={FadeInDown.duration(600).delay(100).springify()}
+                    style={styles.profileContainer}
+                >
                     <View style={styles.avatarContainer}>
-                        <View style={styles.avatar}>
+                        <LinearGradient
+                            colors={['#3b82f6', '#60a5fa']}
+                            style={styles.avatarGradient}
+                        >
                             <Text style={styles.avatarText}>
                                 {user.name.charAt(0).toUpperCase()}
                             </Text>
-                        </View>
+                        </LinearGradient>
                     </View>
 
                     <Text style={styles.name}>{user.name}</Text>
                     <Text style={styles.phone}>ID: {user.clerk_id}</Text>
-                </View>
 
-                <View style={styles.divider} />
-
-                <Text style={styles.sectionTitle}>Account Settings</Text>
-
-                <TouchableOpacity style={styles.optionButton}>
-                    <View style={styles.optionTextContainer}>
-                        <MaterialIcons
-                            name="notifications"
-                            size={24}
-                            color="#3b82f6"
-                            style={styles.optionIcon}
-                        />
-                        <Text style={styles.optionText}>Notification Settings</Text>
+                    <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{user.requests_completed}</Text>
+                            <Text style={styles.statLabel}>Completed</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>{user.requests_pending}</Text>
+                            <Text style={styles.statLabel}>Pending</Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                            <Text style={styles.statValue}>
+                                {new Date(user.member_since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                            </Text>
+                            <Text style={styles.statLabel}>Member Since</Text>
+                        </View>
                     </View>
-                    <MaterialIcons
-                        name="chevron-right"
-                        size={24}
-                        style={styles.optionArrow}
-                    />
-                </TouchableOpacity>
+                </Animated.View>
 
-                <TouchableOpacity style={styles.optionButton}>
-                    <View style={styles.optionTextContainer}>
-                        <MaterialCommunityIcons
-                            name="shield-account"
-                            size={24}
-                            color="#3b82f6"
-                            style={styles.optionIcon}
-                        />
-                        <Text style={styles.optionText}>Privacy & Security</Text>
-                    </View>
-                    <MaterialIcons
-                        name="chevron-right"
-                        size={24}
-                        style={styles.optionArrow}
-                    />
-                </TouchableOpacity>
+                <Animated.View 
+                    entering={FadeInDown.duration(600).delay(200).springify()}
+                    style={styles.sectionContainer}
+                >
+                    <Text style={styles.sectionTitle}>Account Settings</Text>
 
-                <TouchableOpacity style={styles.optionButton}>
-                    <View style={styles.optionTextContainer}>
-                        <MaterialIcons
-                            name="help-outline"
-                            size={24}
-                            color="#3b82f6"
-                            style={styles.optionIcon}
-                        />
-                        <Text style={styles.optionText}>Help & Support</Text>
-                    </View>
-                    <MaterialIcons
-                        name="chevron-right"
-                        size={24}
-                        style={styles.optionArrow}
-                    />
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.optionButton}>
+                        <View style={styles.optionTextContainer}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="notifications-outline" size={24} color="#3b82f6" />
+                            </View>
+                            <Text style={styles.optionText}>Notification Settings</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.optionButton}>
-                    <View style={styles.optionTextContainer}>
-                        <MaterialIcons
-                            name="info-outline"
-                            size={24}
-                            color="#3b82f6"
-                            style={styles.optionIcon}
-                        />
-                        <Text style={styles.optionText}>About</Text>
-                    </View>
-                    <MaterialIcons
-                        name="chevron-right"
-                        size={24}
-                        style={styles.optionArrow}
-                    />
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.optionButton}>
+                        <View style={styles.optionTextContainer}>
+                            <View style={styles.iconContainer}>
+                                <MaterialCommunityIcons name="shield-account" size={24} color="#3b82f6" />
+                            </View>
+                            <Text style={styles.optionText}>Privacy & Security</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                    </TouchableOpacity>
 
-                <SafeAreaView edges={['bottom']} style={{ backgroundColor: 'white' }}>
+                    <TouchableOpacity style={styles.optionButton}>
+                        <View style={styles.optionTextContainer}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="help-circle-outline" size={24} color="#3b82f6" />
+                            </View>
+                            <Text style={styles.optionText}>Help & Support</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.optionButton}>
+                        <View style={styles.optionTextContainer}>
+                            <View style={styles.iconContainer}>
+                                <Ionicons name="information-circle-outline" size={24} color="#3b82f6" />
+                            </View>
+                            <Text style={styles.optionText}>About</Text>
+                        </View>
+                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                    </TouchableOpacity>
+                </Animated.View>
+
+                <SafeAreaView edges={['bottom']} style={styles.bottomContainer}>
                     <TouchableOpacity
                         style={styles.logoutButton}
                         onPress={showLogoutConfirmation}
                     >
-                        <MaterialIcons
-                            name="logout"
-                            size={20}
-                            color="#ef4444"
-                            style={styles.optionIcon}
-                        />
+                        <Ionicons name="log-out-outline" size={20} color="#ef4444" />
                         <Text style={styles.logoutText}>Log Out</Text>
                     </TouchableOpacity>
                 </SafeAreaView>
@@ -255,36 +296,38 @@ const Profile = () => {
                 visible={logoutModalVisible}
                 onRequestClose={() => setLogoutModalVisible(false)}
             >
-                <View style={styles.modalContainer}>
-                    <MaterialIcons
-                        name="warning"
-                        size={48}
-                        color="#f59e0b"
-                        style={{ alignSelf: 'center', marginBottom: 16 }}
-                    />
-                    <Text style={styles.modalTitle}>Log Out</Text>
-                    <Text style={styles.modalText}>
-                        Are you sure you want to log out? You'll need to sign in again to
-                        access your account.
-                    </Text>
-                    <View style={styles.modalButtons}>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.modalCancelButton]}
-                            onPress={() => setLogoutModalVisible(false)}
-                        >
-                            <Text style={[styles.modalButtonText, styles.modalCancelText]}>
-                                Cancel
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.modalConfirmButton]}
-                            onPress={handleLogout}
-                        >
-                            <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
-                                Log Out
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                <View style={styles.modalOverlay}>
+                    <Animated.View 
+                        entering={FadeIn.duration(200)}
+                        style={styles.modalContainer}
+                    >
+                        <View style={styles.modalIconContainer}>
+                            <Ionicons name="warning" size={48} color="#f59e0b" />
+                        </View>
+                        <Text style={styles.modalTitle}>Log Out</Text>
+                        <Text style={styles.modalText}>
+                            Are you sure you want to log out? You'll need to sign in again to
+                            access your account.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalCancelButton]}
+                                onPress={() => setLogoutModalVisible(false)}
+                            >
+                                <Text style={[styles.modalButtonText, styles.modalCancelText]}>
+                                    Cancel
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalConfirmButton]}
+                                onPress={handleLogout}
+                            >
+                                <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
+                                    Log Out
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
                 </View>
             </Modal>
 
@@ -295,32 +338,40 @@ const Profile = () => {
                 visible={editModalVisible}
                 onRequestClose={() => setEditModalVisible(false)}
             >
-                <View style={styles.modalContainer}>
-                    <Text style={styles.modalTitle}>Edit Profile</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={tempName}
-                        onChangeText={setTempName}
-                        placeholder="Enter your name"
-                    />
-                    <View style={styles.modalButtons}>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.modalCancelButton]}
-                            onPress={() => setEditModalVisible(false)}
-                        >
-                            <Text style={[styles.modalButtonText, styles.modalCancelText]}>
-                                Cancel
-                            </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.modalButton, styles.modalConfirmButton]}
-                            onPress={handleUpdateProfile}
-                        >
-                            <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
-                                Save
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                <View style={styles.modalOverlay}>
+                    <Animated.View 
+                        entering={FadeInDown.duration(300).springify()}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitle}>Edit Profile</Text>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.input}
+                                value={tempName}
+                                onChangeText={setTempName}
+                                placeholder="Enter your name"
+                                placeholderTextColor="#94a3b8"
+                            />
+                        </View>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalCancelButton]}
+                                onPress={() => setEditModalVisible(false)}
+                            >
+                                <Text style={[styles.modalButtonText, styles.modalCancelText]}>
+                                    Cancel
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalButton, styles.modalConfirmButton]}
+                                onPress={handleUpdateProfile}
+                            >
+                                <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
+                                    Save
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
                 </View>
             </Modal>
         </SafeAreaView>

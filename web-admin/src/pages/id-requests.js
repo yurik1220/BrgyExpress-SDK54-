@@ -2,293 +2,327 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "../styles/IdRequests.css";
 
-const CreateIDRequests = () => {
-    const [pendingRequests, setPendingRequests] = useState([]);
-    const [history, setHistory] = useState([]);
+const IdRequests = () => {
+    const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
-    const [showRejectForm, setShowRejectForm] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState("");
-    const [historyFilter, setHistoryFilter] = useState("all");
-    const [showAppointmentModal, setShowAppointmentModal] = useState(false);
-    const [appointmentDate, setAppointmentDate] = useState("");
-    const [appointmentTime, setAppointmentTime] = useState("");
+    const [showModal, setShowModal] = useState(false);
+    const [showActionModal, setShowActionModal] = useState(false);
+    const [actionType, setActionType] = useState("");
+    const [actionNote, setActionNote] = useState("");
+    const [filterStatus, setFilterStatus] = useState("all");
 
     useEffect(() => {
-        const fetchIDRequests = async () => {
-            try {
-                const response = await axios.get("http://localhost:5000/api/requests");
-                const allRequests = response.data.filter(req => req.type === "Create ID");
-                const pending = allRequests.filter(req => !req.status || req.status === 'pending');
-                const resolved = allRequests.filter(req => req.status && req.status !== 'pending');
-                setPendingRequests(pending);
-                setHistory(resolved);
-            } catch (error) {
-                setError("Error fetching ID requests");
-                console.error("Fetch error:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchIDRequests();
+        fetchRequests();
     }, []);
 
-    const handleApproveWithAppointment = async () => {
-        if (!appointmentDate || !appointmentTime) {
-            alert("Please select both date and time for the appointment");
-            return;
-        }
-
-        const appointmentDateTime = `${appointmentDate}T${appointmentTime}:00.000Z`;
-
+    const fetchRequests = async () => {
         try {
-            const payload = {
-                status: 'approved',
-                resolved_at: new Date().toISOString(),
-                appointment_date: appointmentDateTime
-            };
-
-            const response = await axios.patch(
-                `http://localhost:5000/api/id-requests/${selectedRequest.id}`,
-                payload,
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-
-            if (response.data && response.data.id) {
-                setPendingRequests(prev => prev.filter(req => req.id !== selectedRequest.id));
-                setHistory(prev => [response.data, ...prev]);
-                setSelectedRequest(null);
-                setShowAppointmentModal(false);
-                setAppointmentDate("");
-                setAppointmentTime("");
-            }
-        } catch (error) {
-            console.error("Update error:", error);
-            alert("Failed to schedule appointment. Please try again.");
+            const response = await axios.get("http://localhost:5000/api/requests");
+            // Filter only ID requests from the response
+            const idRequests = response.data.filter(item => item.type === 'Create ID');
+            setRequests(idRequests);
+            setLoading(false);
+        } catch (err) {
+            setError("Failed to fetch ID requests");
+            setLoading(false);
         }
     };
 
-    const handleDecision = async (status) => {
-        if (!selectedRequest) return;
+    const handleAction = async (requestId, action) => {
+        setActionType(action);
+        setSelectedRequest(requests.find(req => req.id === requestId));
+        setShowActionModal(true);
+    };
 
+    const submitAction = async () => {
         try {
-            const normalizedStatus = status.toLowerCase();
-            const payload = {
-                status: normalizedStatus,
-                resolved_at: new Date().toISOString()
-            };
-
-            if (normalizedStatus === 'rejected') {
-                payload.rejection_reason = rejectionReason;
-            }
-
-            const response = await axios.patch(
-                `http://localhost:5000/api/id-requests/${selectedRequest.id}`,
-                payload,
-                { headers: { 'Content-Type': 'application/json' } }
-            );
-
-            if (response.data && response.data.id) {
-                setPendingRequests(prev => prev.filter(req => req.id !== selectedRequest.id));
-                setHistory(prev => [response.data, ...prev]);
-                setSelectedRequest(null);
-                setShowRejectForm(false);
-                setRejectionReason("");
-            }
-        } catch (error) {
-            console.error("Update error:", error);
-            alert("Failed to update request status");
+            await axios.patch(`http://localhost:5000/api/id-requests/${selectedRequest.id}`, {
+                status: actionType,
+                rejection_reason: actionNote,
+                appointment_date: actionType === 'approved' ? new Date().toISOString() : null
+            });
+            await fetchRequests();
+            setShowActionModal(false);
+            setActionNote("");
+        } catch (err) {
+            setError("Failed to update request status");
         }
     };
 
-    const confirmRejection = () => {
-        if (!rejectionReason.trim()) {
-            alert("Please enter a reason for rejection.");
-            return;
+    const filteredRequests = requests.filter(request => {
+        if (activeTab === "pending") {
+            return request.status === "pending";
+        } else if (activeTab === "history") {
+            return request.status !== "pending";
         }
-        handleDecision("Rejected");
-    };
-
-    const filteredHistory = history.filter(request => {
-        if (historyFilter === "all") return true;
-        return request.status.toLowerCase() === historyFilter.toLowerCase();
+        return true;
     });
 
-    if (loading) return <div className="scrollable-content">Loading ID requests...</div>;
-    if (error) return <div className="scrollable-content">{error}</div>;
+    if (loading) {
+        return (
+            <div className="loading-container">
+                <div className="loading-spinner"></div>
+                <p>Loading ID requests...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="error-container">
+                <i className="fas fa-exclamation-circle"></i>
+                <p>{error}</p>
+            </div>
+        );
+    }
 
     return (
-        <>
+        <div className="id-requests-container">
             <div className="content-header">
-                <h2>🆔 ID Creation Requests</h2>
+                <div className="header-content">
+                    <i className="fas fa-id-card header-icon"></i>
+                    <h1>ID Requests</h1>
+                </div>
+                <div className="header-stats">
+                    <div className="stat-badge">
+                        <span className="stat-label">Pending</span>
+                        <span className="stat-value">
+                            {requests.filter(req => req.status === "pending").length}
+                        </span>
+                    </div>
+                    <div className="stat-badge">
+                        <span className="stat-label">Total</span>
+                        <span className="stat-value">{requests.length}</span>
+                    </div>
+                </div>
             </div>
 
-            <div className="tabs-wrapper" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="tabs-container">
                 <div className="tabs">
                     <button
-                        className={activeTab === "pending" ? "active-tab" : ""}
+                        className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
                         onClick={() => setActiveTab("pending")}
                     >
+                        <i className="fas fa-clock"></i>
                         Pending Requests
                     </button>
                     <button
-                        className={activeTab === "history" ? "active-tab" : ""}
+                        className={`tab-button ${activeTab === "history" ? "active" : ""}`}
                         onClick={() => setActiveTab("history")}
                     >
-                        History Log
+                        <i className="fas fa-history"></i>
+                        History
                     </button>
                 </div>
+                <div className="filter-container">
+                    <select
+                        className="filter-select"
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                    >
+                        <option value="all">All Status</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+            </div>
 
-                {activeTab === "history" && (
-                    <div className="status-dropdown-container">
-                        <select
-                            id="historyFilter"
-                            className="status-dropdown"
-                            value={historyFilter}
-                            onChange={(e) => setHistoryFilter(e.target.value)}
-                        >
-                            <option value="all">All</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                        </select>
+            <div className="requests-grid">
+                {filteredRequests.length === 0 ? (
+                    <div className="empty-state">
+                        <i className="fas fa-inbox"></i>
+                        <p>No ID requests found</p>
                     </div>
+                ) : (
+                    filteredRequests.map(request => (
+                        <div
+                            key={request.id}
+                            className="request-card"
+                            onClick={() => {
+                                setSelectedRequest(request);
+                                setShowModal(true);
+                            }}
+                        >
+                            <div className="card-header">
+                                <span className="request-type">ID Request</span>
+                                <span className={`status-badge ${request.status}`}>
+                                    {request.status}
+                                </span>
+                            </div>
+                            <div className="card-body">
+                                <div className="info-row">
+                                    <i className="fas fa-user"></i>
+                                    <span>{request.full_name}</span>
+                                </div>
+                                <div className="info-row">
+                                    <i className="fas fa-calendar"></i>
+                                    <span>Birth Date: {new Date(request.birth_date).toLocaleDateString()}</span>
+                                </div>
+                                <div className="info-row">
+                                    <i className="fas fa-map-marker-alt"></i>
+                                    <span>{request.address}</span>
+                                </div>
+                                <div className="info-row">
+                                    <i className="fas fa-phone"></i>
+                                    <span>{request.contact}</span>
+                                </div>
+                                <div className="timeline">
+                                    <div className="timeline-item">
+                                        <i className="fas fa-clock"></i>
+                                        <span>Requested {new Date(request.created_at).toLocaleString()}</span>
+                                    </div>
+                                    {request.status !== "pending" && (
+                                        <div className="timeline-item">
+                                            <i className="fas fa-check-circle"></i>
+                                            <span>Updated {new Date(request.resolved_at).toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))
                 )}
             </div>
 
-            <div className="scrollable-content">
-                {activeTab === "pending" && (
-                    <div className="request-list-container">
-                        {pendingRequests.length > 0 ? (
-                            <ul className="request-list">
-                                {pendingRequests.map((request) => (
-                                    <li key={request.id} className="request-card"
-                                        onClick={() => setSelectedRequest(request)}>
-                                        <p><strong>{request.full_name}</strong> requesting ID (Clerk ID: {request.clerk_id})</p>
-                                        <small>{new Date(request.created_at).toLocaleString()}</small>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="no-requests-message">No pending ID requests.</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === "history" && (
-                    <div className="history-content-container">
-                        <div className="history-list-container">
-                            {filteredHistory.length > 0 ? (
-                                <ul className="request-list">
-                                    {filteredHistory.map((request) => (
-                                        <li key={request.id} className={`request-card ${request.status.toLowerCase()}`}
-                                            onClick={() => setSelectedRequest(request)}>
-                                            <p><strong>{request.full_name}</strong> (Clerk ID: {request.clerk_id}) — <em>{request.status}</em></p>
-                                            {request.status.toLowerCase() === 'approved' && request.appointment_date && (
-                                                <p><strong>Pickup Date:</strong> {new Date(request.appointment_date).toLocaleString()}</p>
-                                            )}
-                                            <small>
-                                                Submitted: {new Date(request.created_at).toLocaleString()} |
-                                                Resolved: {new Date(request.resolved_at).toLocaleString()}
-                                            </small>
-                                            {request.status.toLowerCase() === 'rejected' && request.rejection_reason && (
-                                                <p><strong>Rejection Reason:</strong> {request.rejection_reason}</p>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="no-history-message">No {historyFilter === "all" ? "" : historyFilter} requests in history.</p>
-                            )}
+            {showModal && selectedRequest && (
+                <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>ID Request Details</h2>
+                            <button className="close-button" onClick={() => setShowModal(false)}>
+                                <i className="fas fa-times"></i>
+                            </button>
                         </div>
-                    </div>
-                )}
-
-                {selectedRequest && !showRejectForm && !showAppointmentModal && (
-                    <div className="modal-overlay">
-                        <div className="modal">
-                            <h3>ID Request Details</h3>
-                            <div className="modal-content">
-                                <p><strong>Full Name:</strong> {selectedRequest.full_name}</p>
-                                <p><strong>Birth Date:</strong> {new Date(selectedRequest.birth_date).toLocaleDateString()}</p>
-                                <p><strong>Address:</strong> {selectedRequest.address}</p>
-                                <p><strong>Contact:</strong> {selectedRequest.contact}</p>
-                                <p><strong>Clerk ID:</strong> {selectedRequest.clerk_id}</p>
-                                <p><strong>Date Submitted:</strong> {new Date(selectedRequest.created_at).toLocaleString()}</p>
+                        <div className="modal-body">
+                            <div className="detail-item">
+                                <i className="fas fa-user"></i>
+                                <div>
+                                    <label>Full Name</label>
+                                    <p>{selectedRequest.full_name}</p>
+                                </div>
                             </div>
-                            {(!selectedRequest.status || selectedRequest.status === 'pending') && (
-                                <div className="modal-buttons">
-                                    <button onClick={() => setShowAppointmentModal(true)} className="approve">
-                                        Approve
-                                    </button>
-                                    <button onClick={() => setShowRejectForm(true)} className="reject">
-                                        Reject
-                                    </button>
+                            <div className="detail-item">
+                                <i className="fas fa-calendar"></i>
+                                <div>
+                                    <label>Birth Date</label>
+                                    <p>{new Date(selectedRequest.birth_date).toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-map-marker-alt"></i>
+                                <div>
+                                    <label>Address</label>
+                                    <p>{selectedRequest.address}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-phone"></i>
+                                <div>
+                                    <label>Contact</label>
+                                    <p>{selectedRequest.contact}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-clock"></i>
+                                <div>
+                                    <label>Request Date</label>
+                                    <p>{new Date(selectedRequest.created_at).toLocaleString()}</p>
+                                </div>
+                            </div>
+                            {selectedRequest.status !== "pending" && (
+                                <div className="detail-item">
+                                    <i className="fas fa-comment"></i>
+                                    <div>
+                                        <label>Action Note</label>
+                                        <p>{selectedRequest.actionNote}</p>
+                                    </div>
                                 </div>
                             )}
-                            <button onClick={() => setSelectedRequest(null)} className="close">
-                                Close
+                        </div>
+                        {selectedRequest.status === "pending" && (
+                            <div className="modal-footer">
+                                <button
+                                    className="action-button approved"
+                                    onClick={() => handleAction(selectedRequest.id, "approved")}
+                                >
+                                    <i className="fas fa-check"></i>
+                                    Approve
+                                </button>
+                                <button
+                                    className="action-button rejected"
+                                    onClick={() => handleAction(selectedRequest.id, "rejected")}
+                                >
+                                    <i className="fas fa-times"></i>
+                                    Reject
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {showActionModal && selectedRequest && (
+                <div className="modal-overlay" onClick={() => setShowActionModal(false)}>
+                    <div className="modal" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>
+                                {actionType === "approved" ? "Approve" : "Reject"} ID Request
+                            </h2>
+                            <button className="close-button" onClick={() => setShowActionModal(false)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="detail-item">
+                                <i className="fas fa-user"></i>
+                                <div>
+                                    <label>Applicant</label>
+                                    <p>{selectedRequest.full_name}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-id-card"></i>
+                                <div>
+                                    <label>ID Type</label>
+                                    <p>{selectedRequest.idType}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-comment"></i>
+                                <div>
+                                    <label>Action Note</label>
+                                    <textarea
+                                        className="action-textarea"
+                                        value={actionNote}
+                                        onChange={(e) => setActionNote(e.target.value)}
+                                        placeholder="Enter a note about this action..."
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="modal-footer">
+                            <button
+                                className="cancel-button"
+                                onClick={() => setShowActionModal(false)}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className="confirm-button"
+                                onClick={submitAction}
+                            >
+                                Confirm {actionType === "approved" ? "Approval" : "Rejection"}
                             </button>
                         </div>
                     </div>
-                )}
-
-                {showRejectForm && (
-                    <div className="modal-overlay">
-                        <div className="modal">
-                            <h3>Reason for Rejection</h3>
-                            <textarea placeholder="Enter rejection reason..." rows="5"
-                                      className="rejection-textarea" value={rejectionReason}
-                                      onChange={(e) => setRejectionReason(e.target.value)} />
-                            <div className="modal-buttons">
-                                <button onClick={confirmRejection} className="confirm-reject">
-                                    Confirm Rejection
-                                </button>
-                                <button onClick={() => { setShowRejectForm(false); setRejectionReason(""); }} className="cancel">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {showAppointmentModal && (
-                    <div className="modal-overlay">
-                        <div className="modal">
-                            <h3>Schedule Appointment for ID Pickup</h3>
-                            <div className="appointment-form">
-                                <label>
-                                    Date:
-                                    <input type="date" value={appointmentDate}
-                                           onChange={(e) => setAppointmentDate(e.target.value)}
-                                           min={new Date().toISOString().split('T')[0]} />
-                                </label>
-                                <label>
-                                    Time:
-                                    <input type="time" value={appointmentTime}
-                                           onChange={(e) => setAppointmentTime(e.target.value)}
-                                           min="08:00" max="17:00" />
-                                </label>
-                                <p className="appointment-note">
-                                    Note: IDs can be picked up from 8AM to 5PM at the Barangay Hall
-                                </p>
-                            </div>
-                            <div className="modal-buttons">
-                                <button onClick={handleApproveWithAppointment} className="approve">
-                                    Confirm Appointment
-                                </button>
-                                <button onClick={() => { setShowAppointmentModal(false); setAppointmentDate(""); setAppointmentTime(""); }} className="cancel">
-                                    Cancel
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </>
+                </div>
+            )}
+        </div>
     );
-
 };
 
-export default CreateIDRequests;
+export default IdRequests;

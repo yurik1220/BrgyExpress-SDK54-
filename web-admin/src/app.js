@@ -1,14 +1,16 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Dashboard from "./pages/dashboard";
+import React from 'react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import Sidebar from './components/Sidebar';
+import MainContent from './components/MainContent';
+import './styles/Dashboard.css';
 
 function App() {
     return (
         <Router>
-            <Routes>
-                {/* All routes under / will be handled inside Dashboard */}
-                <Route path="/*" element={<Dashboard />} />
-            </Routes>
+            <div className="app-container">
+                <Sidebar />
+                <MainContent />
+            </div>
         </Router>
     );
 }
