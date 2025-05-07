@@ -1,15 +1,18 @@
-import { View, Text, ActivityIndicator, TouchableOpacity, SectionList, RefreshControl, Platform } from "react-native";
+import { View, Text, ActivityIndicator, TouchableOpacity, SectionList, RefreshControl, Platform, Image, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { useAuth } from "@clerk/clerk-expo";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
 import { styles, getStatusStyle } from "@/styles/activity_styles";
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { initNotificationSystem } from '@/lib/notificationHandler';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import { useTabBarVisibility } from "./_layout";
 
 interface Transaction {
     id: string;
@@ -37,6 +40,8 @@ const Activity = () => {
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const router = useRouter();
     const navigation = useNavigation();
+    const { setIsTabBarVisible } = useTabBarVisibility();
+    const lastScrollY = useRef(0);
 
     useEffect(() => {
         let cleanup: (() => void) | undefined;
@@ -136,53 +141,91 @@ const Activity = () => {
             <TouchableOpacity
                 style={styles.card}
                 onPress={() => handlePressItem(item)}
+                activeOpacity={0.7}
             >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={styles.typeText}>
-                        {item.type}
-                        {item.title && `: ${item.title}`}
-                    </Text>
-                    <MaterialIcons name="chevron-right" size={24} color="#95a5a6" />
-                </View>
-
-                {item.type === "Document Request" && (
-                    <>
-                        <Text style={styles.detailText}>Document: {item.document_type}</Text>
-                        <Text style={styles.detailText}>Reason: {item.reason}</Text>
-                    </>
-                )}
-                {item.type === "Create ID" && (
-                    <>
-                        <Text style={styles.detailText}>Name: {item.full_name}</Text>
-                        <Text style={styles.detailText}>Birthdate: {item.birth_date}</Text>
-                    </>
-                )}
-                {item.type === "Incident Report" && (
-                    <>
-                        <Text style={styles.detailText}>Title: {item.title}</Text>
-                        <Text style={styles.detailText}>
-                            Description: {item.description?.substring(0, 50) ?? ''}
-                            {(item.description?.length ?? 0) > 50 ? '...' : ''}
-                        </Text>
-                    </>
-                )}
-
-                <Text style={styles.timestampText}>
-                    Submitted: {new Date(item.created_at).toLocaleString()}
-                </Text>
-
-                {item.status && (
-                    <View style={[styles.statusContainer, statusStyle.container]}>
-                        <Text style={[styles.statusText, statusStyle.text]}>
-                            {item.status.toUpperCase()}
+                <View style={styles.cardHeader}>
+                    <View style={styles.typeContainer}>
+                        <Ionicons 
+                            name={item.type === "Document Request" ? "document-text-outline" : 
+                                  item.type === "Create ID" ? "card-outline" : "warning-outline"} 
+                            size={24} 
+                            color="#3b82f6" 
+                            style={styles.typeIcon}
+                        />
+                        <Text style={styles.typeText}>
+                            {item.type}
+                            {item.title && `: ${item.title}`}
                         </Text>
                     </View>
-                )}
+                    <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
+                </View>
+
+                <View style={styles.detailsContainer}>
+                    {item.type === "Document Request" && (
+                        <>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="document-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>Document: {item.document_type}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="help-circle-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>Reason: {item.reason}</Text>
+                            </View>
+                        </>
+                    )}
+                    {item.type === "Create ID" && (
+                        <>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="person-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>Name: {item.full_name}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="calendar-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>Birthdate: {item.birth_date}</Text>
+                            </View>
+                        </>
+                    )}
+                    {item.type === "Incident Report" && (
+                        <>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="alert-circle-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>Title: {item.title}</Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                                <Ionicons name="chatbubble-outline" size={16} color="#64748b" />
+                                <Text style={styles.detailText}>
+                                    Description: {item.description?.substring(0, 50) ?? ''}
+                                    {(item.description?.length ?? 0) > 50 ? '...' : ''}
+                                </Text>
+                            </View>
+                        </>
+                    )}
+                </View>
+
+                <View style={styles.footerContainer}>
+                    <View style={styles.timestampContainer}>
+                        <Ionicons name="time-outline" size={16} color="#64748b" />
+                        <Text style={styles.timestampText}>
+                            {new Date(item.created_at).toLocaleString()}
+                        </Text>
+                    </View>
+
+                    {item.status && (
+                        <View style={[styles.statusContainer, statusStyle.container]}>
+                            <Text style={[styles.statusText, statusStyle.text]}>
+                                {item.status.toUpperCase()}
+                            </Text>
+                        </View>
+                    )}
+                </View>
 
                 {item.status?.toLowerCase() === 'approved' && item.appointment_date && (
-                    <Text style={styles.detailText}>
-                        Pickup Date: {new Date(item.appointment_date).toLocaleString()}
-                    </Text>
+                    <View style={styles.appointmentContainer}>
+                        <Ionicons name="calendar-outline" size={16} color="#059669" />
+                        <Text style={styles.appointmentText}>
+                            Pickup Date: {new Date(item.appointment_date).toLocaleString()}
+                        </Text>
+                    </View>
                 )}
             </TouchableOpacity>
         );
@@ -196,39 +239,95 @@ const Activity = () => {
         </View>
     );
 
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        
+        // Show tab bar when scrolling up, hide when scrolling down
+        if (currentScrollY < lastScrollY.current) {
+            setIsTabBarVisible(true);
+        } else if (currentScrollY > 100) { // Only hide after scrolling down a bit
+            setIsTabBarVisible(false);
+        }
+        
+        lastScrollY.current = currentScrollY;
+    };
+
     return (
-        <SafeAreaView style={[styles.container, { flex: 1 }]} edges={['top', 'right', 'left']}>
-            <View style={[styles.contentContainer, {
-                flex: 1,
-                paddingBottom: Platform.OS === 'ios' ? 30 : 60 // Adjust this value based on your tab bar height
-            }]}>
-                <Text style={styles.header}>Your Activity</Text>
+        <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
+            <LinearGradient
+                colors={['#f0f9ff', '#e0f2fe', '#bae6fd']}
+                style={styles.gradientBackground}
+            />
+            <Animated.View 
+                entering={FadeIn.duration(1000)}
+                style={styles.floatingDecoration} 
+            />
+            <Animated.View 
+                entering={FadeIn.duration(1000).delay(200)}
+                style={styles.floatingDecoration2} 
+            />
+
+            <View style={styles.contentContainer}>
+                <Animated.View 
+                    entering={FadeInDown.duration(800).springify()}
+                    style={styles.headerContainer}
+                >
+                    <Text style={styles.header}>Your Activity</Text>
+                    <Text style={styles.subheader}>Track your requests and reports</Text>
+                </Animated.View>
 
                 {/* Status Filter Tabs */}
                 <View style={styles.filterContainer}>
                     <TouchableOpacity
                         style={[styles.filterButton, statusFilter === 'all' && styles.activeFilter]}
                         onPress={() => setStatusFilter('all')}
+                        activeOpacity={0.7}
                     >
-                        <Text style={[styles.filterText, statusFilter === 'all' && styles.activeFilterText]}>All</Text>
+                        <Ionicons 
+                            name="apps-outline" 
+                            size={20} 
+                            color={statusFilter === 'all' ? '#ffffff' : '#64748b'} 
+                            style={styles.filterIcon}
+                        />
+                        <Text style={[styles.filterText, statusFilter === 'all' && styles.activeFilterText]}>
+                            All
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.filterButton, statusFilter === 'pending' && styles.activeFilter]}
                         onPress={() => setStatusFilter('pending')}
+                        activeOpacity={0.7}
                     >
-                        <Text style={[styles.filterText, statusFilter === 'pending' && styles.activeFilterText]}>Pending</Text>
+                        <Ionicons 
+                            name="time-outline" 
+                            size={20} 
+                            color={statusFilter === 'pending' ? '#ffffff' : '#64748b'} 
+                            style={styles.filterIcon}
+                        />
+                        <Text style={[styles.filterText, statusFilter === 'pending' && styles.activeFilterText]}>
+                            Pending
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.filterButton, statusFilter === 'completed' && styles.activeFilter]}
                         onPress={() => setStatusFilter('completed')}
+                        activeOpacity={0.7}
                     >
-                        <Text style={[styles.filterText, statusFilter === 'completed' && styles.activeFilterText]}>Completed</Text>
+                        <Ionicons 
+                            name="checkmark-circle-outline" 
+                            size={20} 
+                            color={statusFilter === 'completed' ? '#ffffff' : '#64748b'} 
+                            style={styles.filterIcon}
+                        />
+                        <Text style={[styles.filterText, statusFilter === 'completed' && styles.activeFilterText]}>
+                            Completed
+                        </Text>
                     </TouchableOpacity>
                 </View>
 
                 {loading ? (
-                    <View style={{ flex: 1, justifyContent: 'center' }}>
-                        <ActivityIndicator size="large" />
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color="#3b82f6" />
                     </View>
                 ) : (
                     <SectionList
@@ -236,17 +335,16 @@ const Activity = () => {
                         keyExtractor={(item) => `type-${item.type}-id-${item.id}`}
                         renderItem={renderTransaction}
                         renderSectionHeader={renderSectionHeader}
-                        contentContainerStyle={[
-                            styles.sectionListContent,
-                            { paddingBottom: 35 } // Extra padding at the bottom
-                        ]}
+                        contentContainerStyle={styles.sectionListContent}
                         stickySectionHeadersEnabled={false}
+                        onScroll={handleScroll}
+                        scrollEventThrottle={16}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
                                 onRefresh={onRefresh}
-                                colors={['#3498db']}
-                                tintColor={'#3498db'}
+                                colors={['#3b82f6']}
+                                tintColor={'#3b82f6'}
                             />
                         }
                     />

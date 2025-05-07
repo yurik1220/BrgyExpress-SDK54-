@@ -3,20 +3,23 @@ import axios from "axios";
 import "../styles/IncidentReports.css";
 
 const IncidentReports = () => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [selectedReport, setSelectedReport] = useState(null);
+    const [activeTab, setActiveTab] = useState("pending");
+    const [showActionModal, setShowActionModal] = useState(false);
+    const [actionType, setActionType] = useState("");
     const [pendingIncidents, setPendingIncidents] = useState([]);
     const [activeIncidents, setActiveIncidents] = useState([]);
     const [closedIncidents, setClosedIncidents] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [selectedIncident, setSelectedIncident] = useState(null);
-    const [activeTab, setActiveTab] = useState("pending");
     const [mapUrl, setMapUrl] = useState("");
 
     useEffect(() => {
-        const fetchIncidentReports = async () => {
+        const fetchReports = async () => {
             try {
                 const response = await axios.get("http://localhost:5000/api/requests");
-                const allIncidents = response.data.filter(req => req.type === "Incident Report");
+                // Filter only incident reports from the response
+                const allIncidents = response.data.filter(item => item.type === 'Incident Report');
                 setPendingIncidents(allIncidents.filter(i => !i.status || i.status === 'pending'));
                 setActiveIncidents(allIncidents.filter(i => i.status === 'in_progress'));
                 setClosedIncidents(allIncidents.filter(i => i.status === 'closed'));
@@ -27,33 +30,40 @@ const IncidentReports = () => {
                 setLoading(false);
             }
         };
-        fetchIncidentReports();
+        fetchReports();
     }, []);
 
-    const handleStatusChange = async (newStatus) => {
-        if (!selectedIncident) return;
+    useEffect(() => {
+        if (selectedReport?.location) {
+            const [longitude, latitude] = selectedReport.location.split(",").map(Number);
+            setMapUrl(`https://www.google.com/maps?q=${latitude},${longitude}`);
+        }
+    }, [selectedReport]);
 
+    const handleAction = async () => {
         try {
-            const apiStatus = newStatus.toLowerCase().replace(' ', '_');
+            const payload = {
+                status: actionType === "investigating" ? "in_progress" : "closed",
+                resolved_at: new Date().toISOString()
+            };
 
             const response = await axios.patch(
-                `http://localhost:5000/api/incidents/${selectedIncident.id}`,
-                {
-                    status: apiStatus,
-                    resolved_at: apiStatus === 'closed' ? new Date().toISOString() : null
-                },
-                { headers: { 'Content-Type': 'application/json' } }
+                `http://localhost:5000/api/incidents/${selectedReport.id}`,
+                payload
             );
 
-            if (response.data && response.data.id) {
-                if (apiStatus === 'in_progress') {
-                    setPendingIncidents(prev => prev.filter(i => i.id !== selectedIncident.id));
+            if (response.data) {
+                // Update the respective state based on the new status
+                if (actionType === "investigating") {
+                    setPendingIncidents(prev => prev.filter(i => i.id !== selectedReport.id));
                     setActiveIncidents(prev => [...prev, response.data]);
-                } else if (apiStatus === 'closed') {
-                    setActiveIncidents(prev => prev.filter(i => i.id !== selectedIncident.id));
-                    setClosedIncidents(prev => [response.data, ...prev]);
+                } else {
+                    setActiveIncidents(prev => prev.filter(i => i.id !== selectedReport.id));
+                    setClosedIncidents(prev => [...prev, response.data]);
                 }
-                setSelectedIncident(null);
+                
+                setSelectedReport(null);
+                setShowActionModal(false);
             }
         } catch (error) {
             console.error("Update error:", error);
@@ -61,157 +71,265 @@ const IncidentReports = () => {
         }
     };
 
-    useEffect(() => {
-        if (selectedIncident?.location) {
-            const [longitude, latitude] = selectedIncident.location.split(",").map(Number);
-            setMapUrl(`https://www.google.com/maps?q=${latitude},${longitude}`);
+    const getCurrentIncidents = () => {
+        switch (activeTab) {
+            case "pending":
+                return pendingIncidents;
+            case "active":
+                return activeIncidents;
+            case "closed":
+                return closedIncidents;
+            default:
+                return [];
         }
-    }, [selectedIncident]);
+    };
 
-    if (loading) return <div className="scrollable-content">Loading incident reports...</div>;
-    if (error) return <div className="scrollable-content">{error}</div>;
+    if (loading) return (
+        <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading incident reports...</p>
+        </div>
+    );
+
+    if (error) return (
+        <div className="error-container">
+            <i className="fas fa-exclamation-circle"></i>
+            <p>{error}</p>
+        </div>
+    );
 
     return (
-        <>
+        <div className="incident-reports-container">
             <div className="content-header">
-                <h2>🚨 Incident Reports</h2>
+                <div className="header-content">
+                    <i className="fas fa-exclamation-triangle header-icon"></i>
+                    <h1>Incident Reports</h1>
+                </div>
+                <div className="header-stats">
+                    <div className="stat-badge">
+                        <span className="stat-label">Active</span>
+                        <span className="stat-value">
+                            {activeIncidents.length}
+                        </span>
+                    </div>
+                    <div className="stat-badge">
+                        <span className="stat-label">Total</span>
+                        <span className="stat-value">
+                            {pendingIncidents.length + activeIncidents.length + closedIncidents.length}
+                        </span>
+                    </div>
+                </div>
             </div>
 
-            <div className="tabs-wrapper">
+            <div className="tabs-container">
                 <div className="tabs">
                     <button
-                        className={activeTab === "pending" ? "active-tab" : ""}
+                        className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
                         onClick={() => setActiveTab("pending")}
                     >
+                        <i className="fas fa-clock"></i>
                         Pending Reports
                     </button>
                     <button
-                        className={activeTab === "active" ? "active-tab" : ""}
+                        className={`tab-button ${activeTab === "active" ? "active" : ""}`}
                         onClick={() => setActiveTab("active")}
                     >
-                        Active Incidents
+                        <i className="fas fa-search"></i>
+                        Active Reports
                     </button>
                     <button
-                        className={activeTab === "closed" ? "active-tab" : ""}
+                        className={`tab-button ${activeTab === "closed" ? "active" : ""}`}
                         onClick={() => setActiveTab("closed")}
                     >
-                        Closed Incidents
+                        <i className="fas fa-check-circle"></i>
+                        Closed Reports
                     </button>
                 </div>
             </div>
 
-            <div className="scrollable-content">
-                {activeTab === "pending" && (
-                    <div className="request-list-container">
-                        {pendingIncidents.length > 0 ? (
-                            <ul className="request-list">
-                                {pendingIncidents.map((incident) => (
-                                    <li key={incident.id} className="request-card pending"
-                                        onClick={() => setSelectedIncident(incident)}>
-                                        <p><strong>{incident.title}</strong> reported by Clerk ID: {incident.clerk_id}</p>
-                                        <small>{new Date(incident.created_at).toLocaleString()}</small>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="no-requests-message">No pending incident reports.</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === "active" && (
-                    <div className="request-list-container">
-                        {activeIncidents.length > 0 ? (
-                            <ul className="request-list">
-                                {activeIncidents.map((incident) => (
-                                    <li key={incident.id} className="request-card in-progress"
-                                        onClick={() => setSelectedIncident(incident)}>
-                                        <p><strong>{incident.title}</strong> reported by Clerk ID: {incident.clerk_id}</p>
-                                        <small>{new Date(incident.created_at).toLocaleString()} - In Progress</small>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="no-requests-message">No active incidents.</p>
-                        )}
-                    </div>
-                )}
-
-                {activeTab === "closed" && (
-                    <div className="request-list-container">
-                        {closedIncidents.length > 0 ? (
-                            <ul className="request-list">
-                                {closedIncidents.map((incident) => (
-                                    <li key={incident.id} className="request-card closed"
-                                        onClick={() => setSelectedIncident(incident)}>
-                                        <p><strong>{incident.title}</strong> (Clerk ID: {incident.clerk_id})</p>
-                                        <small>
-                                            Reported: {new Date(incident.created_at).toLocaleString()} |
-                                            Closed: {new Date(incident.resolved_at).toLocaleString()}
-                                        </small>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="no-requests-message">No closed incidents.</p>
-                        )}
-                    </div>
-                )}
-
-                {selectedIncident && (
-                    <div className="modal-overlay">
-                        <div className="modal">
-                            <h3>Incident Details</h3>
-                            <p><strong>Title:</strong> {selectedIncident.title}</p>
-                            <p><strong>Description:</strong> {selectedIncident.description}</p>
-                            <p><strong>Reported by Clerk ID:</strong> {selectedIncident.clerk_id}</p>
-                            <p><strong>Date Reported:</strong> {new Date(selectedIncident.created_at).toLocaleString()}</p>
-                            <p><strong>Status:</strong> {selectedIncident.status ? selectedIncident.status.replace('_', ' ') : 'pending'}</p>
-
-                            {selectedIncident.location && (
-                                <p>
-                                    <strong>Location:</strong>{" "}
-                                    <a href={mapUrl} target="_blank" rel="noopener noreferrer">
-                                        View on Map
-                                    </a>
-                                </p>
-                            )}
-
-                            {selectedIncident.media_url && (
-                                <div className="media-container">
-                                    <strong>Media:</strong>
-                                    <img
-                                        src={`http://localhost:5000${selectedIncident.media_url}`}
-                                        alt="Incident evidence"
-                                        style={{ maxWidth: "100%", maxHeight: "200px" }}
-                                    />
+            <div className="reports-grid">
+                {getCurrentIncidents().length > 0 ? (
+                    getCurrentIncidents().map((report) => (
+                        <div
+                            key={report.id}
+                            className="report-card"
+                            onClick={() => setSelectedReport(report)}
+                        >
+                            <div className="card-header">
+                                <span className="incident-type">{report.title}</span>
+                                <span className={`status-badge ${report.status || 'pending'}`}>
+                                    {report.status || 'Pending'}
+                                </span>
+                            </div>
+                            <div className="card-body">
+                                <div className="info-row">
+                                    <i className="fas fa-map-marker-alt"></i>
+                                    <span>{report.location}</span>
                                 </div>
-                            )}
-
-                            {(!selectedIncident.status || selectedIncident.status === 'pending') && (
-                                <div className="modal-buttons">
-                                    <button onClick={() => handleStatusChange("In Progress")} className="approve">
-                                        Accept Report
-                                    </button>
+                                <div className="info-row">
+                                    <i className="fas fa-user"></i>
+                                    <span>Reported by: {report.clerk_id}</span>
                                 </div>
-                            )}
-
-                            {selectedIncident.status === 'in_progress' && (
-                                <div className="modal-buttons">
-                                    <button onClick={() => handleStatusChange("Closed")} className="reject">
-                                        Close Incident
-                                    </button>
+                                <div className="info-row">
+                                    <i className="fas fa-comment"></i>
+                                    <span>{report.description}</span>
                                 </div>
-                            )}
-
-                            <button onClick={() => setSelectedIncident(null)} className="close">
-                                Close Details
-                            </button>
+                                <div className="info-row">
+                                    <i className="fas fa-clock"></i>
+                                    <span>{new Date(report.created_at).toLocaleString()}</span>
+                                </div>
+                            </div>
                         </div>
+                    ))
+                ) : (
+                    <div className="empty-state">
+                        <i className="fas fa-clipboard-list"></i>
+                        <p>No {activeTab} incident reports</p>
                     </div>
                 )}
             </div>
-        </>
+
+            {selectedReport && !showActionModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h2>Incident Details</h2>
+                            <button className="close-button" onClick={() => setSelectedReport(null)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div className="detail-item">
+                                <i className="fas fa-exclamation-triangle"></i>
+                                <div>
+                                    <label>Title</label>
+                                    <p>{selectedReport.title}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-map-marker-alt"></i>
+                                <div>
+                                    <label>Location</label>
+                                    <p>{selectedReport.location}</p>
+                                    {mapUrl && (
+                                        <button 
+                                            className="map-button"
+                                            onClick={() => window.open(mapUrl, '_blank')}
+                                        >
+                                            <i className="fas fa-map"></i>
+                                            View on Google Maps
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-user"></i>
+                                <div>
+                                    <label>Reporter ID</label>
+                                    <p>{selectedReport.clerk_id}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-comment"></i>
+                                <div>
+                                    <label>Description</label>
+                                    <p>{selectedReport.description}</p>
+                                </div>
+                            </div>
+                            <div className="detail-item">
+                                <i className="fas fa-clock"></i>
+                                <div>
+                                    <label>Reported At</label>
+                                    <p>{new Date(selectedReport.created_at).toLocaleString()}</p>
+                                </div>
+                            </div>
+                            {selectedReport.media_url && (
+                                <div className="detail-item">
+                                    <i className="fas fa-image"></i>
+                                    <div>
+                                        <label>Media Evidence</label>
+                                        <div className="media-container">
+                                            <img 
+                                                src={`http://localhost:5000${selectedReport.media_url}`} 
+                                                alt="Incident Media" 
+                                                className="incident-media"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        {(!selectedReport.status || selectedReport.status === "pending") && (
+                            <div className="modal-footer">
+                                <button 
+                                    className="action-button investigating"
+                                    onClick={() => {
+                                        setActionType("investigating");
+                                        setShowActionModal(true);
+                                    }}
+                                >
+                                    <i className="fas fa-check"></i>
+                                    Accept Incident
+                                </button>
+                            </div>
+                        )}
+                        {selectedReport.status === "in_progress" && (
+                            <div className="modal-footer">
+                                <button 
+                                    className="action-button closed"
+                                    onClick={() => {
+                                        setActionType("closed");
+                                        setShowActionModal(true);
+                                    }}
+                                >
+                                    <i className="fas fa-times"></i>
+                                    Close Report
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {showActionModal && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h2>Confirm Action</h2>
+                            <button 
+                                className="close-button" 
+                                onClick={() => {
+                                    setShowActionModal(false);
+                                }}
+                            >
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <p>Are you sure you want to {actionType === "investigating" ? "accept" : "close"} this incident report?</p>
+                        </div>
+                        <div className="modal-footer">
+                            <button 
+                                className="confirm-button"
+                                onClick={handleAction}
+                            >
+                                <i className="fas fa-check"></i>
+                                Confirm
+                            </button>
+                            <button 
+                                className="cancel-button"
+                                onClick={() => {
+                                    setShowActionModal(false);
+                                }}
+                            >
+                                <i className="fas fa-times"></i>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
 
