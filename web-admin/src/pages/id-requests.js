@@ -13,6 +13,7 @@ const IdRequests = () => {
     const [actionType, setActionType] = useState("");
     const [actionNote, setActionNote] = useState("");
     const [filterStatus, setFilterStatus] = useState("all");
+    const [searchRef, setSearchRef] = useState("");
 
     useEffect(() => {
         fetchRequests();
@@ -59,7 +60,10 @@ const IdRequests = () => {
             return request.status !== "pending";
         }
         return true;
-    });
+    }).filter(request =>
+        searchRef.trim() === "" ||
+        (request.reference_number && request.reference_number.toLowerCase().includes(searchRef.trim().toLowerCase()))
+    );
 
     if (loading) {
         return (
@@ -98,6 +102,15 @@ const IdRequests = () => {
                         <span className="stat-value">{requests.length}</span>
                     </div>
                 </div>
+            </div>
+            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
+                <input
+                    type="text"
+                    placeholder="Search by Reference Number..."
+                    value={searchRef}
+                    onChange={e => setSearchRef(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
+                />
             </div>
 
             <div className="tabs-container">
@@ -198,6 +211,15 @@ const IdRequests = () => {
                             </button>
                         </div>
                         <div className="modal-body">
+                            {selectedRequest.reference_number && (
+                                <div className="detail-item">
+                                    <i className="fas fa-hashtag"></i>
+                                    <div>
+                                        <label>Reference Number</label>
+                                        <p>{selectedRequest.reference_number}</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="detail-item">
                                 <i className="fas fa-user"></i>
                                 <div>

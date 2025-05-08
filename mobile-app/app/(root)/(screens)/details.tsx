@@ -83,7 +83,9 @@ const DetailsScreen = () => {
     status,
     resolved_at,
     rejection_reason,
-    appointment_date
+    appointment_date,
+    reference_number,
+    referenceNumber
   } = params;
 
   const formattedCreatedAt = created_at
@@ -116,9 +118,9 @@ const DetailsScreen = () => {
 
   const getStatusGradient = () => {
     switch(status) {
-      case 'approved': return ['#4CAF50', '#45a049'];
-      case 'rejected': return ['#F44336', '#e53935'];
-      default: return ['#2196F3', '#1e88e5'];
+      case 'approved': return ['#4CAF50', '#45a049'] as const;
+      case 'rejected': return ['#F44336', '#e53935'] as const;
+      default: return ['#2196F3', '#1e88e5'] as const;
     }
   };
 
@@ -178,6 +180,17 @@ const DetailsScreen = () => {
         <Text style={styles.sectionTitle}>Request Information</Text>
       </View>
       <View style={styles.sectionContent}>
+        {(reference_number || referenceNumber) && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+            <Ionicons name="pricetag" size={20} color="#7F5AF0" style={{ marginRight: 8 }} />
+            <Text style={{ fontWeight: 'bold', color: '#7F5AF0', fontSize: 16 }}>
+              Reference No.:
+            </Text>
+            <Text selectable style={{ marginLeft: 8, fontSize: 16 }}>
+              {reference_number || referenceNumber}
+            </Text>
+          </View>
+        )}
         <DetailRow icon="person" label="Submitted by" value={clerk_id as string} iconType="ion" />
         <DetailRow icon="calendar" label="Date Submitted" value={formattedCreatedAt} iconType="ion" />
         {status && <DetailRow icon="time" label="Date Resolved" value={formattedResolvedAt} iconType="ion" />}

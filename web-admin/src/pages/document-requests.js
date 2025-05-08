@@ -15,6 +15,7 @@ const DocumentRequests = () => {
     const [showAppointmentModal, setShowAppointmentModal] = useState(false);
     const [appointmentDate, setAppointmentDate] = useState("");
     const [appointmentTime, setAppointmentTime] = useState("");
+    const [searchRef, setSearchRef] = useState("");
 
     useEffect(() => {
         const fetchDocumentRequests = async () => {
@@ -111,10 +112,17 @@ const DocumentRequests = () => {
         handleDecision("Rejected");
     };
 
+    const filteredPending = pendingRequests.filter(request =>
+        searchRef.trim() === "" ||
+        (request.reference_number && request.reference_number.toLowerCase().includes(searchRef.trim().toLowerCase()))
+    );
     const filteredHistory = history.filter(request => {
         if (historyFilter === "all") return true;
         return request.status.toLowerCase() === historyFilter.toLowerCase();
-    });
+    }).filter(request =>
+        searchRef.trim() === "" ||
+        (request.reference_number && request.reference_number.toLowerCase().includes(searchRef.trim().toLowerCase()))
+    );
 
     if (loading) return (
         <div className="loading-container">
@@ -147,6 +155,15 @@ const DocumentRequests = () => {
                         <span className="stat-value">{pendingRequests.length + history.length}</span>
                     </div>
                 </div>
+            </div>
+            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
+                <input
+                    type="text"
+                    placeholder="Search by Reference Number..."
+                    value={searchRef}
+                    onChange={e => setSearchRef(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
+                />
             </div>
 
             <div className="tabs-container">
@@ -184,8 +201,8 @@ const DocumentRequests = () => {
 
             <div className="requests-grid">
                 {activeTab === "pending" ? (
-                    pendingRequests.length > 0 ? (
-                        pendingRequests.map((request) => (
+                    filteredPending.length > 0 ? (
+                        filteredPending.map((request) => (
                             <div
                                 key={request.id}
                                 className="request-card"
@@ -284,6 +301,15 @@ const DocumentRequests = () => {
                             </button>
                         </div>
                         <div className="modal-body">
+                            {selectedRequest.reference_number && (
+                                <div className="detail-item">
+                                    <i className="fas fa-hashtag"></i>
+                                    <div>
+                                        <label>Reference Number</label>
+                                        <p>{selectedRequest.reference_number}</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="detail-item">
                                 <i className="fas fa-file-alt"></i>
                                 <div>
