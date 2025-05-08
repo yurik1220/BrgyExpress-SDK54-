@@ -14,6 +14,8 @@ import { useAuth } from "@clerk/clerk-expo";
 import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn, FadeInDown, SlideInRight, FadeInUp } from "react-native-reanimated";
+import { useTabBarVisibility } from "../_layout";
+import { useFocusEffect } from "@react-navigation/native";
 
 interface Comment {
     id: number;
@@ -45,6 +47,7 @@ export default function AnnouncementDetail() {
     const { id } = useLocalSearchParams();
     const { userId } = useAuth();
     const queryClient = useQueryClient();
+    const { setIsTabBarVisible } = useTabBarVisibility();
     const [newComment, setNewComment] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [showCommentInput, setShowCommentInput] = useState(false);
@@ -71,6 +74,14 @@ export default function AnnouncementDetail() {
             keyboardDidHideListener.remove();
         };
     }, []);
+
+    // Handle tab bar visibility with useFocusEffect
+    useFocusEffect(
+        React.useCallback(() => {
+            setIsTabBarVisible(false);
+            return () => setIsTabBarVisible(true);
+        }, [])
+    );
 
     // Fetch announcement
     const {

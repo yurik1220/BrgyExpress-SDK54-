@@ -13,6 +13,7 @@ const IncidentReports = () => {
     const [activeIncidents, setActiveIncidents] = useState([]);
     const [closedIncidents, setClosedIncidents] = useState([]);
     const [mapUrl, setMapUrl] = useState("");
+    const [searchRef, setSearchRef] = useState("");
 
     useEffect(() => {
         const fetchReports = async () => {
@@ -72,16 +73,26 @@ const IncidentReports = () => {
     };
 
     const getCurrentIncidents = () => {
+        let incidents = [];
         switch (activeTab) {
             case "pending":
-                return pendingIncidents;
+                incidents = pendingIncidents;
+                break;
             case "active":
-                return activeIncidents;
+                incidents = activeIncidents;
+                break;
             case "closed":
-                return closedIncidents;
+                incidents = closedIncidents;
+                break;
             default:
-                return [];
+                incidents = [];
         }
+        if (searchRef.trim() !== "") {
+            return incidents.filter(i =>
+                i.reference_number && i.reference_number.toLowerCase().includes(searchRef.trim().toLowerCase())
+            );
+        }
+        return incidents;
     };
 
     if (loading) return (
@@ -119,6 +130,15 @@ const IncidentReports = () => {
                         </span>
                     </div>
                 </div>
+            </div>
+            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
+                <input
+                    type="text"
+                    placeholder="Search by Reference Number..."
+                    value={searchRef}
+                    onChange={e => setSearchRef(e.target.value)}
+                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
+                />
             </div>
 
             <div className="tabs-container">
@@ -199,6 +219,15 @@ const IncidentReports = () => {
                             </button>
                         </div>
                         <div className="modal-body">
+                            {selectedReport.reference_number && (
+                                <div className="detail-item">
+                                    <i className="fas fa-hashtag"></i>
+                                    <div>
+                                        <label>Reference Number</label>
+                                        <p>{selectedReport.reference_number}</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="detail-item">
                                 <i className="fas fa-exclamation-triangle"></i>
                                 <div>

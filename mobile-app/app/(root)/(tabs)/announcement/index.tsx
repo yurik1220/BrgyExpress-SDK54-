@@ -76,9 +76,24 @@ export default function AnnouncementsList() {
 
     const getPriorityBadge = (priority: string) => {
         const priorityConfig = {
-            high: { color: '#FF4D4D', icon: 'alert-circle' as const, text: 'Urgent' },
-            medium: { color: '#FFAA33', icon: 'alert' as const, text: 'Important' },
-            low: { color: '#2CB67D', icon: 'information-circle' as const, text: 'Info' }
+            high: { 
+                color: '#FF4D4D', 
+                icon: 'alert-circle' as const, 
+                text: 'Urgent',
+                gradient: ['#FF4D4D20', '#FF4D4D10']
+            },
+            medium: { 
+                color: '#FFAA33', 
+                icon: 'alert' as const, 
+                text: 'Important',
+                gradient: ['#FFAA3320', '#FFAA3310']
+            },
+            low: { 
+                color: '#2CB67D', 
+                icon: 'information-circle' as const, 
+                text: 'Info',
+                gradient: ['#2CB67D20', '#2CB67D10']
+            }
         };
 
         const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.low;
@@ -88,10 +103,17 @@ export default function AnnouncementsList() {
                 entering={FadeIn.duration(400)}
                 style={[styles.priorityBadge, { backgroundColor: `${config.color}20` }]}
             >
-                <Ionicons name={config.icon} size={14} color={config.color} />
-                <Text style={[styles.priorityText, { color: config.color }]}>
-                    {config.text}
-                </Text>
+                <LinearGradient
+                    colors={config.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.priorityGradient}
+                >
+                    <Ionicons name={config.icon} size={14} color={config.color} />
+                    <Text style={[styles.priorityText, { color: config.color }]}>
+                        {config.text}
+                    </Text>
+                </LinearGradient>
             </Animated.View>
         );
     };
@@ -153,11 +175,23 @@ export default function AnnouncementsList() {
             style={styles.backgroundGradient}
         >
             <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-                <Animated.View style={styles.header}>
-                    <Text style={styles.screenTitle}>Announcements</Text>
-                    <TouchableOpacity style={styles.filterButton}>
-                        <Ionicons name="filter" size={20} color="#7F5AF0" />
-                    </TouchableOpacity>
+                <Animated.View 
+                    entering={FadeInDown.duration(400)}
+                    style={styles.header}
+                >
+                    <View style={styles.headerContent}>
+                        <Text style={styles.screenTitle}>Announcements</Text>
+                        <TouchableOpacity style={styles.filterButton}>
+                            <LinearGradient
+                                colors={['#7F5AF020', '#7F5AF010']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.filterGradient}
+                            >
+                                <Ionicons name="filter" size={20} color="#7F5AF0" />
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
                 </Animated.View>
 
                 <FlatList
@@ -171,9 +205,14 @@ export default function AnnouncementsList() {
                             entering={FadeIn.duration(800)}
                             style={styles.emptyContainer}
                         >
-                            <Ionicons name="megaphone" size={48} color="#B8C1EC" />
-                            <Text style={styles.emptyTitle}>No Announcements Yet</Text>
-                            <Text style={styles.emptySubtitle}>Check back later for updates</Text>
+                            <LinearGradient
+                                colors={['#B8C1EC20', '#B8C1EC10']}
+                                style={styles.emptyGradient}
+                            >
+                                <Ionicons name="megaphone" size={48} color="#B8C1EC" />
+                                <Text style={styles.emptyTitle}>No Announcements Yet</Text>
+                                <Text style={styles.emptySubtitle}>Check back later for updates</Text>
+                            </LinearGradient>
                         </Animated.View>
                     }
                     refreshControl={
