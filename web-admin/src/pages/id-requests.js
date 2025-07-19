@@ -85,34 +85,71 @@ const IdRequests = () => {
 
     return (
         <div className="id-requests-container">
+            {/* Enhanced Header */}
             <div className="content-header">
                 <div className="header-content">
-                    <i className="fas fa-id-card header-icon"></i>
-                    <h1>ID Requests</h1>
+                    <div className="header-icon-wrapper">
+                        <i className="fas fa-id-card header-icon"></i>
+                    </div>
+                    <div className="header-text">
+                        <h1>ID Requests</h1>
+                        <p>Process and manage ID card requests from residents</p>
+                    </div>
                 </div>
                 <div className="header-stats">
-                    <div className="stat-badge">
-                        <span className="stat-label">Pending</span>
-                        <span className="stat-value">
-                            {requests.filter(req => req.status === "pending").length}
-                        </span>
+                    <div className="stat-badge pending">
+                        <div className="stat-icon">
+                            <i className="fas fa-clock"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{requests.filter(req => req.status === "pending").length}</span>
+                            <span className="stat-label">Pending</span>
+                        </div>
                     </div>
-                    <div className="stat-badge">
-                        <span className="stat-label">Total</span>
-                        <span className="stat-value">{requests.length}</span>
+                    <div className="stat-badge approved">
+                        <div className="stat-icon">
+                            <i className="fas fa-check-circle"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{requests.filter(req => req.status === "approved").length}</span>
+                            <span className="stat-label">Approved</span>
+                        </div>
+                    </div>
+                    <div className="stat-badge total">
+                        <div className="stat-icon">
+                            <i className="fas fa-id-card"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{requests.length}</span>
+                            <span className="stat-label">Total</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
-                <input
-                    type="text"
-                    placeholder="Search by Reference Number..."
-                    value={searchRef}
-                    onChange={e => setSearchRef(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
-                />
+
+            {/* Enhanced Search Bar */}
+            <div className="search-container">
+                <div className="search-wrapper">
+                    <i className="fas fa-search search-icon"></i>
+                    <input
+                        type="text"
+                        placeholder="Search by Reference Number..."
+                        value={searchRef}
+                        onChange={e => setSearchRef(e.target.value)}
+                        className="search-input"
+                    />
+                    {searchRef && (
+                        <button 
+                            className="clear-search"
+                            onClick={() => setSearchRef("")}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* Enhanced Tabs */}
             <div className="tabs-container">
                 <div className="tabs">
                     <button
@@ -120,224 +157,240 @@ const IdRequests = () => {
                         onClick={() => setActiveTab("pending")}
                     >
                         <i className="fas fa-clock"></i>
-                        Pending Requests
+                        <span>Pending Requests</span>
+                        <span className="tab-count">{requests.filter(req => req.status === "pending").length}</span>
                     </button>
                     <button
                         className={`tab-button ${activeTab === "history" ? "active" : ""}`}
                         onClick={() => setActiveTab("history")}
                     >
                         <i className="fas fa-history"></i>
-                        History
+                        <span>History</span>
+                        <span className="tab-count">{requests.filter(req => req.status !== "pending").length}</span>
                     </button>
                 </div>
-                <div className="filter-container">
-                    <select
-                        className="filter-select"
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                    >
-                        <option value="all">All Status</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="completed">Completed</option>
-                    </select>
-                </div>
+                {activeTab === "history" && (
+                    <div className="filter-container">
+                        <select
+                            className="filter-select"
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                        >
+                            <option value="all">All Status</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                )}
             </div>
 
+            {/* Enhanced Requests Grid */}
             <div className="requests-grid">
                 {filteredRequests.length === 0 ? (
                     <div className="empty-state">
-                        <i className="fas fa-inbox"></i>
-                        <p>No ID requests found</p>
+                        <div className="empty-icon">
+                            <i className="fas fa-id-card"></i>
+                        </div>
+                        <h3>No ID Requests Found</h3>
+                        <p>No {activeTab} ID requests available.</p>
                     </div>
                 ) : (
                     filteredRequests.map(request => (
                         <div
                             key={request.id}
-                            className="request-card"
+                            className={`request-card ${request.status}-card`}
                             onClick={() => {
                                 setSelectedRequest(request);
                                 setShowModal(true);
                             }}
                         >
                             <div className="card-header">
-                                <span className="request-type">ID Request</span>
+                                <div className="request-info">
+                                    <span className="request-type">
+                                        <i className="fas fa-id-card"></i>
+                                        ID Request
+                                    </span>
+                                    <span className="reference-number">
+                                        #{request.reference_number}
+                                    </span>
+                                </div>
                                 <span className={`status-badge ${request.status}`}>
+                                    <i className={`fas fa-${request.status === 'approved' ? 'check' : request.status === 'rejected' ? 'times' : 'clock'}`}></i>
                                     {request.status}
                                 </span>
                             </div>
                             <div className="card-body">
-                                <div className="info-row">
-                                    <i className="fas fa-user"></i>
-                                    <span>{request.full_name}</span>
-                                </div>
-                                <div className="info-row">
-                                    <i className="fas fa-calendar"></i>
-                                    <span>Birth Date: {new Date(request.birth_date).toLocaleDateString()}</span>
-                                </div>
-                                <div className="info-row">
-                                    <i className="fas fa-map-marker-alt"></i>
-                                    <span>{request.address}</span>
-                                </div>
-                                <div className="info-row">
-                                    <i className="fas fa-phone"></i>
-                                    <span>{request.contact}</span>
-                                </div>
-                                <div className="timeline">
-                                    <div className="timeline-item">
-                                        <i className="fas fa-clock"></i>
-                                        <span>Requested {new Date(request.created_at).toLocaleString()}</span>
+                                <div className="info-section">
+                                    <div className="info-row">
+                                        <i className="fas fa-user"></i>
+                                        <span className="label">Name:</span>
+                                        <span className="value">{request.full_name}</span>
                                     </div>
-                                    {request.status !== "pending" && (
-                                        <div className="timeline-item">
-                                            <i className="fas fa-check-circle"></i>
-                                            <span>Updated {new Date(request.resolved_at).toLocaleString()}</span>
-                                        </div>
-                                    )}
+                                    <div className="info-row">
+                                        <i className="fas fa-calendar"></i>
+                                        <span className="label">Birth Date:</span>
+                                        <span className="value">{new Date(request.birth_date).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-map-marker-alt"></i>
+                                        <span className="label">Address:</span>
+                                        <span className="value">{request.address}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-phone"></i>
+                                        <span className="label">Contact:</span>
+                                        <span className="value">{request.contact}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-clock"></i>
+                                        <span className="label">Requested:</span>
+                                        <span className="value">{new Date(request.created_at).toLocaleDateString()}</span>
+                                    </div>
                                 </div>
+                                {request.status === "pending" && (
+                                    <div className="card-actions">
+                                        <button 
+                                            className="action-btn approve"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAction(request.id, "approved");
+                                            }}
+                                        >
+                                            <i className="fas fa-check"></i>
+                                            Approve
+                                        </button>
+                                        <button 
+                                            className="action-btn reject"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleAction(request.id, "rejected");
+                                            }}
+                                        >
+                                            <i className="fas fa-times"></i>
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))
                 )}
             </div>
 
+            {/* Enhanced Detail Modal */}
             {showModal && selectedRequest && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay">
+                    <div className="modal">
                         <div className="modal-header">
-                            <h2>ID Request Details</h2>
-                            <button className="close-button" onClick={() => setShowModal(false)}>
+                            <h3>ID Request Details</h3>
+                            <button className="close-btn" onClick={() => setShowModal(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <div className="modal-body">
-                            {selectedRequest.reference_number && (
+                            <div className="request-details">
                                 <div className="detail-item">
-                                    <i className="fas fa-hashtag"></i>
-                                    <div>
-                                        <label>Reference Number</label>
-                                        <p>{selectedRequest.reference_number}</p>
-                                    </div>
+                                    <span className="label">Reference Number:</span>
+                                    <span className="value">#{selectedRequest.reference_number}</span>
                                 </div>
-                            )}
-                            <div className="detail-item">
-                                <i className="fas fa-user"></i>
-                                <div>
-                                    <label>Full Name</label>
-                                    <p>{selectedRequest.full_name}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-calendar"></i>
-                                <div>
-                                    <label>Birth Date</label>
-                                    <p>{new Date(selectedRequest.birth_date).toLocaleDateString()}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-map-marker-alt"></i>
-                                <div>
-                                    <label>Address</label>
-                                    <p>{selectedRequest.address}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-phone"></i>
-                                <div>
-                                    <label>Contact</label>
-                                    <p>{selectedRequest.contact}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-clock"></i>
-                                <div>
-                                    <label>Request Date</label>
-                                    <p>{new Date(selectedRequest.created_at).toLocaleString()}</p>
-                                </div>
-                            </div>
-                            {selectedRequest.status !== "pending" && (
                                 <div className="detail-item">
-                                    <i className="fas fa-comment"></i>
-                                    <div>
-                                        <label>Action Note</label>
-                                        <p>{selectedRequest.actionNote}</p>
-                                    </div>
+                                    <span className="label">Full Name:</span>
+                                    <span className="value">{selectedRequest.full_name}</span>
                                 </div>
-                            )}
+                                <div className="detail-item">
+                                    <span className="label">Birth Date:</span>
+                                    <span className="value">{new Date(selectedRequest.birth_date).toLocaleDateString()}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Address:</span>
+                                    <span className="value">{selectedRequest.address}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Contact Number:</span>
+                                    <span className="value">{selectedRequest.contact}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Request Date:</span>
+                                    <span className="value">{new Date(selectedRequest.created_at).toLocaleString()}</span>
+                                </div>
+                                {selectedRequest.status !== "pending" && (
+                                    <div className="detail-item">
+                                        <span className="label">Processed Date:</span>
+                                        <span className="value">{new Date(selectedRequest.resolved_at).toLocaleString()}</span>
+                                    </div>
+                                )}
+                                {selectedRequest.rejection_reason && (
+                                    <div className="detail-item">
+                                        <span className="label">Rejection Reason:</span>
+                                        <span className="value">{selectedRequest.rejection_reason}</span>
+                                    </div>
+                                )}
+                                {selectedRequest.appointment_date && (
+                                    <div className="detail-item">
+                                        <span className="label">Appointment Date:</span>
+                                        <span className="value">{new Date(selectedRequest.appointment_date).toLocaleString()}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        {selectedRequest.status === "pending" && (
-                            <div className="modal-footer">
-                                <button
-                                    className="action-button approved"
-                                    onClick={() => handleAction(selectedRequest.id, "approved")}
-                                >
-                                    <i className="fas fa-check"></i>
-                                    Approve
-                                </button>
-                                <button
-                                    className="action-button rejected"
-                                    onClick={() => handleAction(selectedRequest.id, "rejected")}
-                                >
-                                    <i className="fas fa-times"></i>
-                                    Reject
-                                </button>
-                            </div>
-                        )}
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowModal(false)}>
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
+            {/* Enhanced Action Modal */}
             {showActionModal && selectedRequest && (
-                <div className="modal-overlay" onClick={() => setShowActionModal(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay">
+                    <div className="modal">
                         <div className="modal-header">
-                            <h2>
-                                {actionType === "approved" ? "Approve" : "Reject"} ID Request
-                            </h2>
-                            <button className="close-button" onClick={() => setShowActionModal(false)}>
+                            <h3>
+                                {actionType === "approved" ? "Approve ID Request" : "Reject ID Request"}
+                            </h3>
+                            <button className="close-btn" onClick={() => setShowActionModal(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <div className="modal-body">
-                            <div className="detail-item">
-                                <i className="fas fa-user"></i>
-                                <div>
-                                    <label>Applicant</label>
-                                    <p>{selectedRequest.full_name}</p>
+                            <p>
+                                {actionType === "approved" 
+                                    ? "Are you sure you want to approve this ID request?" 
+                                    : "Please provide a reason for rejecting this ID request:"
+                                }
+                            </p>
+                            {actionType === "rejected" && (
+                                <textarea
+                                    value={actionNote}
+                                    onChange={(e) => setActionNote(e.target.value)}
+                                    placeholder="Enter rejection reason..."
+                                    className="rejection-textarea"
+                                />
+                            )}
+                            <div className="request-summary">
+                                <div className="summary-item">
+                                    <span className="label">Name:</span>
+                                    <span className="value">{selectedRequest.full_name}</span>
                                 </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-id-card"></i>
-                                <div>
-                                    <label>ID Type</label>
-                                    <p>{selectedRequest.idType}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-comment"></i>
-                                <div>
-                                    <label>Action Note</label>
-                                    <textarea
-                                        className="action-textarea"
-                                        value={actionNote}
-                                        onChange={(e) => setActionNote(e.target.value)}
-                                        placeholder="Enter a note about this action..."
-                                    />
+                                <div className="summary-item">
+                                    <span className="label">Contact:</span>
+                                    <span className="value">{selectedRequest.contact}</span>
                                 </div>
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <button
-                                className="cancel-button"
-                                onClick={() => setShowActionModal(false)}
-                            >
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowActionModal(false)}>
                                 Cancel
                             </button>
-                            <button
-                                className="confirm-button"
+                            <button 
+                                className={actionType === "approved" ? "btn-success" : "btn-danger"}
                                 onClick={submitAction}
+                                disabled={actionType === "rejected" && !actionNote.trim()}
                             >
-                                Confirm {actionType === "approved" ? "Approval" : "Rejection"}
+                                {actionType === "approved" ? "Approve Request" : "Reject Request"}
                             </button>
                         </div>
                     </div>

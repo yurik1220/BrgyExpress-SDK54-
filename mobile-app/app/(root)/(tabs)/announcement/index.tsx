@@ -1,4 +1,4 @@
-import { View, FlatList, TouchableOpacity, Text, RefreshControl, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { View, FlatList, TouchableOpacity, Text, RefreshControl, NativeScrollEvent, NativeSyntheticEvent, Image } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ActivityIndicator } from "react-native-paper";
@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { 
     FadeInDown, 
     FadeIn, 
+    FadeInRight,
     useSharedValue, 
     useAnimatedStyle,
     withSpring,
@@ -25,6 +26,7 @@ interface Announcement {
     priority: string;
     created_at: string;
     category?: string;
+    media_url?: string;
 }
 
 export default function AnnouncementsList() {
@@ -68,167 +70,361 @@ export default function AnnouncementsList() {
 
     if (isLoading && !refreshing) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#7F5AF0" />
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#667eea" />
+                <Text style={{ color: '#6b7280', fontSize: 16, marginTop: 16, fontWeight: '500' }}>Loading announcements...</Text>
             </SafeAreaView>
         );
     }
 
-    const getPriorityBadge = (priority: string) => {
+    const getPriorityConfig = (priority: string) => {
         const priorityConfig = {
             high: { 
-                color: '#FF4D4D', 
+                color: '#ef4444', 
                 icon: 'alert-circle' as const, 
                 text: 'Urgent',
-                gradient: ['#FF4D4D20', '#FF4D4D10']
+                gradient: ['#ef4444', '#dc2626'],
+                bgColor: '#fef2f2',
+                borderColor: '#fecaca'
             },
             medium: { 
-                color: '#FFAA33', 
+                color: '#f59e0b', 
                 icon: 'alert' as const, 
                 text: 'Important',
-                gradient: ['#FFAA3320', '#FFAA3310']
+                gradient: ['#f59e0b', '#d97706'],
+                bgColor: '#fffbeb',
+                borderColor: '#fed7aa'
             },
             low: { 
-                color: '#2CB67D', 
+                color: '#10b981', 
                 icon: 'information-circle' as const, 
                 text: 'Info',
-                gradient: ['#2CB67D20', '#2CB67D10']
+                gradient: ['#10b981', '#059669'],
+                bgColor: '#f0fdf4',
+                borderColor: '#bbf7d0'
             }
         };
 
-        const config = priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.low;
+        return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.low;
+    };
 
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - date.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) return 'Today';
+        if (diffDays === 2) return 'Yesterday';
+        if (diffDays <= 7) return `${diffDays - 1} days ago`;
+        
+        return date.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+        });
+    };
+
+    const renderItem = ({ item, index }: { item: Announcement; index: number }) => {
+        const priorityConfig = getPriorityConfig(item.priority);
+        
         return (
             <Animated.View 
-                entering={FadeIn.duration(400)}
-                style={[styles.priorityBadge, { backgroundColor: `${config.color}20` }]}
+                entering={FadeInRight.duration(600).delay(index * 100).springify()}
             >
-                <LinearGradient
-                    colors={config.gradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.priorityGradient}
+                <TouchableOpacity
+                    style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 20,
+                        marginBottom: 12,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.08,
+                        shadowRadius: 16,
+                        elevation: 8,
+                        padding: 20,
+                        borderWidth: 1,
+                        borderColor: 'rgba(0, 0, 0, 0.03)',
+                    }}
+                    onPress={() => router.push(`/announcement/${item.id}`)}
+                    activeOpacity={0.95}
                 >
-                    <Ionicons name={config.icon} size={14} color={config.color} />
-                    <Text style={[styles.priorityText, { color: config.color }]}>
-                        {config.text}
-                    </Text>
-                </LinearGradient>
+                    {/* Header with Priority Badge */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                        <LinearGradient
+                            colors={priorityConfig.gradient as [string, string]}
+                            style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginRight: 14,
+                                shadowColor: priorityConfig.color,
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 8,
+                                elevation: 4,
+                            }}
+                        >
+                            <Ionicons name={priorityConfig.icon} size={24} color="#ffffff" />
+                        </LinearGradient>
+                        
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ 
+                                fontWeight: '700', 
+                                fontSize: 18, 
+                                color: '#1f2937',
+                                marginBottom: 4,
+                                letterSpacing: -0.2
+                            }} numberOfLines={2}>
+                                {item.title}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="time-outline" size={12} color="#9ca3af" style={{ marginRight: 4 }} />
+                                <Text style={{ 
+                                    color: '#6b7280', 
+                                    fontSize: 13,
+                                    fontWeight: '500'
+                                }}>
+                                    {formatDate(item.created_at)}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={{
+                            backgroundColor: priorityConfig.bgColor,
+                            borderRadius: 16,
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            borderWidth: 1,
+                            borderColor: priorityConfig.borderColor,
+                            shadowColor: priorityConfig.color,
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 2,
+                            elevation: 1,
+                        }}>
+                            <Text style={{ 
+                                color: priorityConfig.color, 
+                                fontWeight: '600', 
+                                fontSize: 11,
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5
+                            }}>
+                                {priorityConfig.text}
+                            </Text>
+                        </View>
+                    </View>
+
+                    {/* Content */}
+                    <View style={{ marginBottom: item.media_url ? 16 : 0 }}>
+                        <Text style={{ 
+                            color: '#6b7280', 
+                            fontSize: 14,
+                            lineHeight: 20,
+                            fontWeight: '400'
+                        }} numberOfLines={3}>
+                            {item.content}
+                        </Text>
+                    </View>
+
+                    {/* Media */}
+                    {item.media_url && (
+                        <View style={{
+                            borderRadius: 16,
+                            overflow: 'hidden',
+                            marginBottom: 16,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 8,
+                            elevation: 4,
+                        }}>
+                            <Image
+                                source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${item.media_url}` }}
+                                style={{
+                                    width: '100%',
+                                    height: 200,
+                                }}
+                                resizeMode="cover"
+                            />
+                        </View>
+                    )}
+
+                    {/* Footer with Category and Chevron */}
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        paddingTop: 12,
+                        borderTopWidth: 1,
+                        borderTopColor: '#f1f5f9'
+                    }}>
+                        {item.category && (
+                            <View style={{
+                                backgroundColor: '#f0f9ff',
+                                borderRadius: 12,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderWidth: 1,
+                                borderColor: '#bae6fd',
+                                shadowColor: '#0ea5e9',
+                                shadowOffset: { width: 0, height: 1 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 2,
+                                elevation: 1,
+                            }}>
+                                <Text style={{ 
+                                    color: '#0ea5e9', 
+                                    fontWeight: '600', 
+                                    fontSize: 11 
+                                }}>
+                                    {item.category}
+                                </Text>
+                            </View>
+                        )}
+
+                        <View style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 16,
+                            backgroundColor: '#f8fafc',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 2,
+                            elevation: 1,
+                        }}>
+                            <Ionicons name="chevron-forward" size={16} color="#667eea" />
+                        </View>
+                    </View>
+                </TouchableOpacity>
             </Animated.View>
         );
     };
 
-    const renderItem = ({ item, index }: { item: Announcement; index: number }) => (
-        <Animated.View 
-            entering={FadeInDown.duration(400).delay(index * 100).springify()}
-        >
-            <TouchableOpacity
-                style={styles.itemContainer}
-                onPress={() => router.push(`/announcement/${item.id}`)}
-                activeOpacity={0.8}
-            >
-                <LinearGradient
-                    colors={['#ffffff', '#f9f9ff']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gradientBackground}
-                >
-                    <View style={styles.headerRow}>
-                        <View style={styles.titleWrapper}>
-                            <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
-                            {item.category && (
-                                <View style={styles.categoryBadge}>
-                                    <Text style={styles.categoryText}>{item.category}</Text>
-                                </View>
-                            )}
-                        </View>
-                        {getPriorityBadge(item.priority)}
-                    </View>
-
-                    <Text style={styles.content} numberOfLines={3}>
-                        {item.content}
-                    </Text>
-
-                    <View style={styles.footerRow}>
-                        <View style={styles.dateBadge}>
-                            <MaterialIcons name="access-time" size={14} color="#7F5AF0" />
-                            <Text style={styles.date}>
-                                {new Date(item.created_at).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                })}
-                            </Text>
-                        </View>
-                        <View style={styles.chevronCircle}>
-                            <MaterialIcons name="chevron-right" size={18} color="#7F5AF0" />
-                        </View>
-                    </View>
-                </LinearGradient>
-            </TouchableOpacity>
-        </Animated.View>
-    );
-
     return (
-        <LinearGradient
-            colors={['#F8F9FF', '#F0F2FF']}
-            style={styles.backgroundGradient}
-        >
-            <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top', 'right', 'left']}>
+            <LinearGradient
+                colors={['#f8fafc', '#ffffff']}
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
+            />
+            
+            <View style={{ flex: 1, paddingHorizontal: 20 }}>
+                {/* Header */}
                 <Animated.View 
-                    entering={FadeInDown.duration(400)}
-                    style={styles.header}
+                    entering={FadeInDown.duration(800).springify()}
+                    style={{ alignItems: 'center', marginTop: 16, marginBottom: 20 }}
                 >
-                    <View style={styles.headerContent}>
-                        <Text style={styles.screenTitle}>Announcements</Text>
-                        <TouchableOpacity style={styles.filterButton}>
-                            <LinearGradient
-                                colors={['#7F5AF020', '#7F5AF010']}
-                                start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
-                                style={styles.filterGradient}
-                            >
-                                <Ionicons name="filter" size={20} color="#7F5AF0" />
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    </View>
+                    <LinearGradient
+                        colors={['#667eea', '#764ba2']}
+                        style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: 30,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginBottom: 12,
+                            shadowColor: '#667eea',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 16,
+                            elevation: 8,
+                        }}
+                    >
+                        <Ionicons name="megaphone" size={28} color="#ffffff" />
+                    </LinearGradient>
+                    <Text style={{ 
+                        fontSize: 28, 
+                        fontWeight: '800', 
+                        color: '#1f2937', 
+                        marginBottom: 6,
+                        letterSpacing: -0.5
+                    }}>
+                        Announcements
+                    </Text>
+                    <Text style={{ 
+                        fontSize: 15, 
+                        color: '#6b7280',
+                        textAlign: 'center',
+                        lineHeight: 20,
+                        fontWeight: '400'
+                    }}>
+                        Stay updated with important news and updates
+                    </Text>
                 </Animated.View>
 
-                <FlatList
-                    ref={flatListRef}
-                    data={announcements}
-                    renderItem={renderItem}
-                    keyExtractor={(item) => item.id.toString()}
-                    contentContainerStyle={styles.listContent}
-                    ListEmptyComponent={
-                        <Animated.View 
-                            entering={FadeIn.duration(800)}
-                            style={styles.emptyContainer}
-                        >
-                            <LinearGradient
-                                colors={['#B8C1EC20', '#B8C1EC10']}
-                                style={styles.emptyGradient}
-                            >
-                                <Ionicons name="megaphone" size={48} color="#B8C1EC" />
-                                <Text style={styles.emptyTitle}>No Announcements Yet</Text>
-                                <Text style={styles.emptySubtitle}>Check back later for updates</Text>
-                            </LinearGradient>
-                        </Animated.View>
-                    }
+                {/* Content */}
+                <Animated.ScrollView
+                    entering={FadeIn.duration(400).delay(400)}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ paddingBottom: 32 }}
+                    showsVerticalScrollIndicator={false}
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            colors={['#7F5AF0']}
-                            tintColor="#7F5AF0"
-                            progressBackgroundColor="#ffffff"
+                            colors={['#667eea']}
+                            tintColor={'#667eea'}
                         />
                     }
-                    showsVerticalScrollIndicator={false}
-                    onScroll={handleScroll}
-                    scrollEventThrottle={16}
-                />
-            </SafeAreaView>
-        </LinearGradient>
+                >
+                    {!announcements || announcements.length === 0 ? (
+                        <View style={{ 
+                            alignItems: 'center', 
+                            marginTop: 40,
+                            paddingHorizontal: 40
+                        }}>
+                            <View style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: 40,
+                                backgroundColor: '#f1f5f9',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 16,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 4,
+                                elevation: 1,
+                            }}>
+                                <Ionicons name="megaphone-outline" size={32} color="#cbd5e1" />
+                            </View>
+                            <Text style={{ 
+                                color: '#64748b', 
+                                fontSize: 18, 
+                                fontWeight: '600',
+                                marginBottom: 8,
+                                textAlign: 'center',
+                                letterSpacing: -0.2
+                            }}>
+                                No announcements yet
+                            </Text>
+                            <Text style={{ 
+                                color: '#94a3b8', 
+                                fontSize: 14,
+                                textAlign: 'center',
+                                lineHeight: 20,
+                                fontWeight: '400'
+                            }}>
+                                Check back later for important updates and news.
+                            </Text>
+                        </View>
+                    ) : (
+                        announcements.map((item: Announcement, index: number) => (
+                            <View key={item.id}>
+                                {renderItem({ item, index })}
+                            </View>
+                        ))
+                    )}
+                </Animated.ScrollView>
+            </View>
+        </SafeAreaView>
     );
 }

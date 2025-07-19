@@ -98,115 +98,254 @@ const AnnouncementPage = () => {
         }
     };
 
-    if (loading) return <div className="loading-message">Loading announcements...</div>;
-    if (error) return <div className="error-message">{error}</div>;
+    if (loading) return (
+        <div className="loading-container">
+            <div className="loading-spinner"></div>
+            <p>Loading announcements...</p>
+        </div>
+    );
+    
+    if (error) return (
+        <div className="error-container">
+            <i className="fas fa-exclamation-circle"></i>
+            <p>{error}</p>
+        </div>
+    );
 
     return (
-        <div className="announcement-page-container modern-announcement-page">
-            <div className="modern-header">
-                <div className="header-left">
-                    <i className="fas fa-bullhorn header-icon"></i>
-                    <h1>Announcements</h1>
+        <div className="announcement-page-container">
+            {/* Enhanced Header */}
+            <div className="content-header">
+                <div className="header-content">
+                    <div className="header-icon-wrapper">
+                        <i className="fas fa-bullhorn header-icon"></i>
+                    </div>
+                    <div className="header-text">
+                        <h1>Announcements</h1>
+                        <p>Create and manage community announcements</p>
+                    </div>
                 </div>
-                <button className="create-announcement-btn" onClick={() => setShowForm(true)}>
-                    <i className="fas fa-plus"></i> New Announcement
-                </button>
-            </div>
-
-            <div className="scrollable-content">
-                {showForm && (
-                    <div className="announcement-form-modal">
-                        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-                            <div className="modal modern-modal" onClick={e => e.stopPropagation()}>
-                                <h2>Create Announcement</h2>
-                                <form onSubmit={handleSubmit} className="modern-form">
-                                    <div className="form-group">
-                                        <label>Title</label>
-                                        <input type="text" name="title" value={formData.title} onChange={handleChange} required />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Content</label>
-                                        <textarea name="content" value={formData.content} onChange={handleChange} required />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Priority</label>
-                                        <select name="priority" value={formData.priority} onChange={handleChange}>
-                                            <option value="normal">Normal</option>
-                                            <option value="important">Important</option>
-                                            <option value="urgent">Urgent</option>
-                                        </select>
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Media (Optional)</label>
-                                        <input type="file" name="media" onChange={handleFileChange} accept="image/*,video/*,application/pdf" />
-                                        {mediaPreview && (
-                                            <div className="media-preview">
-                                                {formData.media.type.startsWith('image/') ? (
-                                                    <img src={mediaPreview} alt="Preview" />
-                                                ) : (
-                                                    <div className="file-preview">
-                                                        <span>{formData.media.name}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="form-actions">
-                                        <button type="submit" className="primary-btn">Post</button>
-                                        <button type="button" className="secondary-btn" onClick={() => setShowForm(false)}>Cancel</button>
-                                    </div>
-                                </form>
-                            </div>
+                <div className="header-stats">
+                    <div className="stat-badge total">
+                        <div className="stat-icon">
+                            <i className="fas fa-bullhorn"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{announcements.length}</span>
+                            <span className="stat-label">Total</span>
                         </div>
                     </div>
-                )}
-
-                <div className="announcements-list modern-announcements-list">
-                    {announcements.length === 0 ? (
-                        <div className="empty-state modern-empty-state">
-                            <i className="fas fa-bullhorn"></i>
-                            <p>No announcements yet. Click "New Announcement" to get started!</p>
+                    <div className="stat-badge urgent">
+                        <div className="stat-icon">
+                            <i className="fas fa-exclamation-triangle"></i>
                         </div>
-                    ) : (
-                        announcements.map(announcement => (
-                            <div key={announcement.id} className={`announcement-card modern-announcement-card ${announcement.priority}`}>
-                                <div className="announcement-header">
-                                    <h3>{announcement.title}</h3>
-                                    <span className={`priority-badge ${announcement.priority}`}>{announcement.priority}</span>
+                        <div className="stat-content">
+                            <span className="stat-value">{announcements.filter(a => a.priority === 'urgent').length}</span>
+                            <span className="stat-label">Urgent</span>
+                        </div>
+                    </div>
+                    <button className="create-announcement-btn" onClick={() => setShowForm(true)}>
+                        <i className="fas fa-plus"></i>
+                        <span>New Announcement</span>
+                    </button>
+                </div>
+            </div>
+
+            {/* Enhanced Announcements List */}
+            <div className="announcements-list">
+                {announcements.length === 0 ? (
+                    <div className="empty-state">
+                        <div className="empty-icon">
+                            <i className="fas fa-bullhorn"></i>
+                        </div>
+                        <h3>No Announcements Yet</h3>
+                        <p>Click "New Announcement" to get started!</p>
+                        <button className="create-first-btn" onClick={() => setShowForm(true)}>
+                            <i className="fas fa-plus"></i>
+                            Create First Announcement
+                        </button>
+                    </div>
+                ) : (
+                    announcements.map(announcement => (
+                        <div key={announcement.id} className={`announcement-card ${announcement.priority}`}>
+                            <div className="card-header">
+                                <div className="announcement-info">
+                                    <h3 className="announcement-title">{announcement.title}</h3>
+                                    <div className="announcement-meta">
+                                        <span className="announcement-date">
+                                            <i className="fas fa-calendar-alt"></i>
+                                            {new Date(announcement.created_at).toLocaleDateString()}
+                                        </span>
+                                        <span className="announcement-time">
+                                            <i className="fas fa-clock"></i>
+                                            {new Date(announcement.created_at).toLocaleTimeString()}
+                                        </span>
+                                    </div>
                                 </div>
+                                <div className="announcement-actions">
+                                    <span className={`priority-badge ${announcement.priority}`}>
+                                        <i className={`fas fa-${announcement.priority === 'urgent' ? 'exclamation-triangle' : announcement.priority === 'important' ? 'exclamation-circle' : 'info-circle'}`}></i>
+                                        {announcement.priority}
+                                    </span>
+                                    <button 
+                                        className="delete-btn"
+                                        onClick={() => handleDelete(announcement.id)}
+                                        title="Delete announcement"
+                                    >
+                                        <i className="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="card-body">
                                 <div className="announcement-content">
                                     <p>{announcement.content}</p>
-                                    {announcement.media_url && (
-                                        <div className="announcement-media">
-                                            {announcement.media_url.endsWith('.pdf') ? (
-                                                <a href={`http://localhost:5000${announcement.media_url}`} target="_blank" rel="noopener noreferrer">View PDF</a>
-                                            ) : announcement.media_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                                                <img src={`http://localhost:5000${announcement.media_url}`} alt="Announcement media" />
-                                            ) : announcement.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
+                                </div>
+                                {announcement.media_url && (
+                                    <div className="announcement-media">
+                                        {announcement.media_url.endsWith('.pdf') ? (
+                                            <a 
+                                                href={`http://localhost:5000${announcement.media_url}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="media-link pdf"
+                                            >
+                                                <i className="fas fa-file-pdf"></i>
+                                                <span>View PDF Document</span>
+                                            </a>
+                                        ) : announcement.media_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                                            <div className="media-image">
+                                                <img 
+                                                    src={`http://localhost:5000${announcement.media_url}`} 
+                                                    alt="Announcement media" 
+                                                />
+                                            </div>
+                                        ) : announcement.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
+                                            <div className="media-video">
                                                 <video controls>
                                                     <source src={`http://localhost:5000${announcement.media_url}`} />
+                                                    Your browser does not support the video tag.
                                                 </video>
+                                            </div>
+                                        ) : (
+                                            <a 
+                                                href={`http://localhost:5000${announcement.media_url}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="media-link file"
+                                            >
+                                                <i className="fas fa-file"></i>
+                                                <span>View File</span>
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="announcement-footer">
+                                    <div className="footer-stats">
+                                        <span className="stat-item">
+                                            <i className="fas fa-comments"></i>
+                                            {announcement.comment_count || 0} comments
+                                        </span>
+                                        <span className="stat-item">
+                                            <i className="fas fa-smile"></i>
+                                            {announcement.reaction_count || 0} reactions
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
+            {/* Enhanced Create Announcement Modal */}
+            {showForm && (
+                <div className="modal-overlay">
+                    <div className="modal">
+                        <div className="modal-header">
+                            <h3>Create New Announcement</h3>
+                            <button className="close-btn" onClick={() => setShowForm(false)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <form onSubmit={handleSubmit} className="announcement-form">
+                            <div className="modal-body">
+                                <div className="form-group">
+                                    <label htmlFor="title">Title *</label>
+                                    <input
+                                        type="text"
+                                        id="title"
+                                        name="title"
+                                        value={formData.title}
+                                        onChange={handleChange}
+                                        placeholder="Enter announcement title..."
+                                        className="form-input"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="content">Content *</label>
+                                    <textarea
+                                        id="content"
+                                        name="content"
+                                        value={formData.content}
+                                        onChange={handleChange}
+                                        placeholder="Enter announcement content..."
+                                        className="form-textarea"
+                                        rows="6"
+                                        required
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="priority">Priority</label>
+                                    <select
+                                        id="priority"
+                                        name="priority"
+                                        value={formData.priority}
+                                        onChange={handleChange}
+                                        className="form-select"
+                                    >
+                                        <option value="normal">Normal</option>
+                                        <option value="important">Important</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="media">Media (Optional)</label>
+                                    <input
+                                        type="file"
+                                        id="media"
+                                        name="media"
+                                        onChange={handleFileChange}
+                                        accept="image/*,video/*,application/pdf"
+                                        className="form-file"
+                                    />
+                                    {mediaPreview && (
+                                        <div className="media-preview">
+                                            {formData.media.type.startsWith('image/') ? (
+                                                <img src={mediaPreview} alt="Preview" />
                                             ) : (
-                                                <a href={`http://localhost:5000${announcement.media_url}`} target="_blank" rel="noopener noreferrer">View File</a>
+                                                <div className="file-preview">
+                                                    <i className="fas fa-file"></i>
+                                                    <span>{formData.media.name}</span>
+                                                </div>
                                             )}
                                         </div>
                                     )}
                                 </div>
-                                <div className="announcement-footer modern-announcement-footer">
-                                    <div className="footer-meta">
-                                        <span><i className="fas fa-calendar-alt"></i> {new Date(announcement.created_at).toLocaleString()}</span>
-                                        <span><i className="fas fa-comments"></i> {announcement.comment_count} </span>
-                                        <span><i className="fas fa-smile"></i> {announcement.reaction_count} </span>
-                                    </div>
-                                    <button className="delete-btn" onClick={() => handleDelete(announcement.id)}>
-                                        <i className="fas fa-trash"></i> Delete
-                                    </button>
-                                </div>
                             </div>
-                        ))
-                    )}
+                            <div className="modal-actions">
+                                <button type="button" className="btn-secondary" onClick={() => setShowForm(false)}>
+                                    Cancel
+                                </button>
+                                <button type="submit" className="btn-primary">
+                                    <i className="fas fa-paper-plane"></i>
+                                    Post Announcement
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

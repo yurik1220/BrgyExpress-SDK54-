@@ -1,11 +1,13 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
-import '../styles/Dashboard.css';
+import '../styles/Sidebar.css';
 
-const Sidebar = () => {
+const Sidebar = ({ onSignOut }) => {
+    // Get admin data from localStorage
+    const adminData = JSON.parse(localStorage.getItem('adminData') || '{}');
     return (
         <div className="sidebar">
-            <h2>🇵🇭 BrgyExpress</h2>
+            <h2>PH BrgyExpress</h2>
             <ul>
                 <li>
                     <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
@@ -37,7 +39,34 @@ const Sidebar = () => {
                         Announcement Page
                     </NavLink>
                 </li>
+                <li>
+                    <NavLink to="/audit-logs" className={({ isActive }) => isActive ? 'active' : ''}>
+                        <i className="fas fa-history"></i>
+                        Audit Logs
+                    </NavLink>
+                </li>
             </ul>
+            
+            {/* Admin Profile Section */}
+            <div className="sidebar-user-section">
+                <div className="user-info">
+                    <div className="user-avatar">
+                        {adminData.full_name ? adminData.full_name.charAt(0).toUpperCase() : 'A'}
+                    </div>
+                    <div className="user-details">
+                        <div className="user-name">
+                            {adminData.full_name || 'Barangay Secretary'}
+                        </div>
+                        <div className="user-email">
+                            {adminData.username || 'admin'}
+                        </div>
+                    </div>
+                </div>
+                <button className="sign-out-button" onClick={onSignOut}>
+                    <i className="fas fa-sign-out-alt"></i>
+                    Sign Out
+                </button>
+            </div>
         </div>
     );
 };

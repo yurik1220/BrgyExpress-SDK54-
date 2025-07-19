@@ -111,36 +111,71 @@ const IncidentReports = () => {
 
     return (
         <div className="incident-reports-container">
+            {/* Enhanced Header */}
             <div className="content-header">
                 <div className="header-content">
-                    <i className="fas fa-exclamation-triangle header-icon"></i>
-                    <h1>Incident Reports</h1>
+                    <div className="header-icon-wrapper">
+                        <i className="fas fa-exclamation-triangle header-icon"></i>
+                    </div>
+                    <div className="header-text">
+                        <h1>Incident Reports</h1>
+                        <p>Monitor and manage emergency reports from residents</p>
+                    </div>
                 </div>
                 <div className="header-stats">
-                    <div className="stat-badge">
-                        <span className="stat-label">Active</span>
-                        <span className="stat-value">
-                            {activeIncidents.length}
-                        </span>
+                    <div className="stat-badge pending">
+                        <div className="stat-icon">
+                            <i className="fas fa-clock"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{pendingIncidents.length}</span>
+                            <span className="stat-label">Pending</span>
+                        </div>
                     </div>
-                    <div className="stat-badge">
-                        <span className="stat-label">Total</span>
-                        <span className="stat-value">
-                            {pendingIncidents.length + activeIncidents.length + closedIncidents.length}
-                        </span>
+                    <div className="stat-badge active">
+                        <div className="stat-icon">
+                            <i className="fas fa-search"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{activeIncidents.length}</span>
+                            <span className="stat-label">Active</span>
+                        </div>
+                    </div>
+                    <div className="stat-badge total">
+                        <div className="stat-icon">
+                            <i className="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{pendingIncidents.length + activeIncidents.length + closedIncidents.length}</span>
+                            <span className="stat-label">Total</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
-                <input
-                    type="text"
-                    placeholder="Search by Reference Number..."
-                    value={searchRef}
-                    onChange={e => setSearchRef(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
-                />
+
+            {/* Enhanced Search Bar */}
+            <div className="search-container">
+                <div className="search-wrapper">
+                    <i className="fas fa-search search-icon"></i>
+                    <input
+                        type="text"
+                        placeholder="Search by Reference Number..."
+                        value={searchRef}
+                        onChange={e => setSearchRef(e.target.value)}
+                        className="search-input"
+                    />
+                    {searchRef && (
+                        <button 
+                            className="clear-search"
+                            onClick={() => setSearchRef("")}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* Enhanced Tabs */}
             <div className="tabs-container">
                 <div className="tabs">
                     <button
@@ -148,211 +183,182 @@ const IncidentReports = () => {
                         onClick={() => setActiveTab("pending")}
                     >
                         <i className="fas fa-clock"></i>
-                        Pending Reports
+                        <span>Pending Reports</span>
+                        <span className="tab-count">{pendingIncidents.length}</span>
                     </button>
                     <button
                         className={`tab-button ${activeTab === "active" ? "active" : ""}`}
                         onClick={() => setActiveTab("active")}
                     >
                         <i className="fas fa-search"></i>
-                        Active Reports
+                        <span>Active Reports</span>
+                        <span className="tab-count">{activeIncidents.length}</span>
                     </button>
                     <button
                         className={`tab-button ${activeTab === "closed" ? "active" : ""}`}
                         onClick={() => setActiveTab("closed")}
                     >
                         <i className="fas fa-check-circle"></i>
-                        Closed Reports
+                        <span>Closed Reports</span>
+                        <span className="tab-count">{closedIncidents.length}</span>
                     </button>
                 </div>
             </div>
 
+            {/* Enhanced Reports Grid */}
             <div className="reports-grid">
-                {getCurrentIncidents().length > 0 ? (
+                {getCurrentIncidents().length === 0 ? (
+                    <div className="empty-state">
+                        <div className="empty-icon">
+                            <i className="fas fa-shield-check"></i>
+                        </div>
+                        <h3>No {activeTab} Reports</h3>
+                        <p>All incident reports have been processed!</p>
+                    </div>
+                ) : (
                     getCurrentIncidents().map((report) => (
                         <div
                             key={report.id}
-                            className="report-card"
+                            className={`report-card ${report.status || 'pending'}-card`}
                             onClick={() => setSelectedReport(report)}
                         >
                             <div className="card-header">
-                                <span className="incident-type">{report.title}</span>
+                                <div className="report-info">
+                                    <span className="report-type">
+                                        <i className="fas fa-exclamation-triangle"></i>
+                                        Incident Report
+                                    </span>
+                                    <span className="reference-number">
+                                        #{report.reference_number}
+                                    </span>
+                                </div>
                                 <span className={`status-badge ${report.status || 'pending'}`}>
+                                    <i className={`fas fa-${report.status === 'in_progress' ? 'search' : report.status === 'closed' ? 'check' : 'clock'}`}></i>
                                     {report.status || 'Pending'}
                                 </span>
                             </div>
                             <div className="card-body">
-                                <div className="info-row">
-                                    <i className="fas fa-map-marker-alt"></i>
-                                    <span>{report.location}</span>
+                                <div className="info-section">
+                                    <div className="info-row">
+                                        <i className="fas fa-exclamation-triangle"></i>
+                                        <span className="label">Title:</span>
+                                        <span className="value">{report.title}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-map-marker-alt"></i>
+                                        <span className="label">Location:</span>
+                                        <span className="value">{report.location}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-user"></i>
+                                        <span className="label">Reporter:</span>
+                                        <span className="value">{report.clerk_id}</span>
+                                    </div>
+                                    <div className="info-row">
+                                        <i className="fas fa-calendar"></i>
+                                        <span className="label">Reported:</span>
+                                        <span className="value">{new Date(report.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="info-row description">
+                                        <i className="fas fa-comment"></i>
+                                        <span className="label">Description:</span>
+                                        <span className="value">{report.description}</span>
+                                    </div>
                                 </div>
-                                <div className="info-row">
-                                    <i className="fas fa-user"></i>
-                                    <span>Reported by: {report.clerk_id}</span>
-                                </div>
-                                <div className="info-row">
-                                    <i className="fas fa-comment"></i>
-                                    <span>{report.description}</span>
-                                </div>
-                                <div className="info-row">
-                                    <i className="fas fa-clock"></i>
-                                    <span>{new Date(report.created_at).toLocaleString()}</span>
-                                </div>
+                                {(report.status === 'pending' || report.status === 'in_progress') && (
+                                    <div className="card-actions">
+                                        {report.status === 'pending' && (
+                                            <button 
+                                                className="action-btn investigate"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedReport(report);
+                                                    setActionType("investigating");
+                                                    setShowActionModal(true);
+                                                }}
+                                            >
+                                                <i className="fas fa-search"></i>
+                                                Start Investigation
+                                            </button>
+                                        )}
+                                        {report.status === 'in_progress' && (
+                                            <button 
+                                                className="action-btn close"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedReport(report);
+                                                    setActionType("resolved");
+                                                    setShowActionModal(true);
+                                                }}
+                                            >
+                                                <i className="fas fa-check"></i>
+                                                Mark Resolved
+                                            </button>
+                                        )}
+                                        <button 
+                                            className="action-btn view-map"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (report.location) {
+                                                    const [longitude, latitude] = report.location.split(",").map(Number);
+                                                    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
+                                                }
+                                            }}
+                                        >
+                                            <i className="fas fa-map"></i>
+                                            View Map
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))
-                ) : (
-                    <div className="empty-state">
-                        <i className="fas fa-clipboard-list"></i>
-                        <p>No {activeTab} incident reports</p>
-                    </div>
                 )}
             </div>
 
-            {selectedReport && !showActionModal && (
+            {/* Enhanced Action Modal */}
+            {showActionModal && selectedReport && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <div className="modal-header">
-                            <h2>Incident Details</h2>
-                            <button className="close-button" onClick={() => setSelectedReport(null)}>
+                            <h3>
+                                {actionType === "investigating" ? "Start Investigation" : "Mark as Resolved"}
+                            </h3>
+                            <button className="close-btn" onClick={() => setShowActionModal(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <div className="modal-body">
-                            {selectedReport.reference_number && (
+                            <p>
+                                {actionType === "investigating" 
+                                    ? "Are you sure you want to start investigating this incident?" 
+                                    : "Are you sure you want to mark this incident as resolved?"
+                                }
+                            </p>
+                            <div className="incident-details">
                                 <div className="detail-item">
-                                    <i className="fas fa-hashtag"></i>
-                                    <div>
-                                        <label>Reference Number</label>
-                                        <p>{selectedReport.reference_number}</p>
-                                    </div>
+                                    <span className="label">Title:</span>
+                                    <span className="value">{selectedReport.title}</span>
                                 </div>
-                            )}
-                            <div className="detail-item">
-                                <i className="fas fa-exclamation-triangle"></i>
-                                <div>
-                                    <label>Title</label>
-                                    <p>{selectedReport.title}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-map-marker-alt"></i>
-                                <div>
-                                    <label>Location</label>
-                                    <p>{selectedReport.location}</p>
-                                    {mapUrl && (
-                                        <button 
-                                            className="map-button"
-                                            onClick={() => window.open(mapUrl, '_blank')}
-                                        >
-                                            <i className="fas fa-map"></i>
-                                            View on Google Maps
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-user"></i>
-                                <div>
-                                    <label>Reporter ID</label>
-                                    <p>{selectedReport.clerk_id}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-comment"></i>
-                                <div>
-                                    <label>Description</label>
-                                    <p>{selectedReport.description}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-clock"></i>
-                                <div>
-                                    <label>Reported At</label>
-                                    <p>{new Date(selectedReport.created_at).toLocaleString()}</p>
-                                </div>
-                            </div>
-                            {selectedReport.media_url && (
                                 <div className="detail-item">
-                                    <i className="fas fa-image"></i>
-                                    <div>
-                                        <label>Media Evidence</label>
-                                        <div className="media-container">
-                                            <img 
-                                                src={`http://localhost:5000${selectedReport.media_url}`} 
-                                                alt="Incident Media" 
-                                                className="incident-media"
-                                            />
-                                        </div>
-                                    </div>
+                                    <span className="label">Location:</span>
+                                    <span className="value">{selectedReport.location}</span>
                                 </div>
-                            )}
+                                <div className="detail-item">
+                                    <span className="label">Description:</span>
+                                    <span className="value">{selectedReport.description}</span>
+                                </div>
+                            </div>
                         </div>
-                        {(!selectedReport.status || selectedReport.status === "pending") && (
-                            <div className="modal-footer">
-                                <button 
-                                    className="action-button investigating"
-                                    onClick={() => {
-                                        setActionType("investigating");
-                                        setShowActionModal(true);
-                                    }}
-                                >
-                                    <i className="fas fa-check"></i>
-                                    Accept Incident
-                                </button>
-                            </div>
-                        )}
-                        {selectedReport.status === "in_progress" && (
-                            <div className="modal-footer">
-                                <button 
-                                    className="action-button closed"
-                                    onClick={() => {
-                                        setActionType("closed");
-                                        setShowActionModal(true);
-                                    }}
-                                >
-                                    <i className="fas fa-times"></i>
-                                    Close Report
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {showActionModal && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Confirm Action</h2>
-                            <button 
-                                className="close-button" 
-                                onClick={() => {
-                                    setShowActionModal(false);
-                                }}
-                            >
-                                <i className="fas fa-times"></i>
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowActionModal(false)}>
+                                Cancel
                             </button>
-                        </div>
-                        <div className="modal-body">
-                            <p>Are you sure you want to {actionType === "investigating" ? "accept" : "close"} this incident report?</p>
-                        </div>
-                        <div className="modal-footer">
                             <button 
-                                className="confirm-button"
+                                className={actionType === "investigating" ? "btn-warning" : "btn-success"}
                                 onClick={handleAction}
                             >
-                                <i className="fas fa-check"></i>
-                                Confirm
-                            </button>
-                            <button 
-                                className="cancel-button"
-                                onClick={() => {
-                                    setShowActionModal(false);
-                                }}
-                            >
-                                <i className="fas fa-times"></i>
-                                Cancel
+                                {actionType === "investigating" ? "Start Investigation" : "Mark Resolved"}
                             </button>
                         </div>
                     </div>

@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 //  Import UI and utility components from React Native
 import {
     View, Text, TextInput, TouchableOpacity,
-    Image, ScrollView, ActivityIndicator, Alert,
-    KeyboardAvoidingView, Platform,
+    Image, ActivityIndicator, Alert,
+    KeyboardAvoidingView, Platform, SafeAreaView,
 } from "react-native";
 // Import camera, location, biometric auth, and routing utilities
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
@@ -19,7 +19,7 @@ import { images } from "@/constants";
 import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated, { FadeIn, FadeInDown, FadeInUp } from "react-native-reanimated";
 import { styles } from "@/styles/ir_styles";
 
 //  Type definition for media (image)
@@ -238,44 +238,65 @@ const IncidentReportScreen = () => {
     //  Show camera permission request screen if not granted
     if (!permission.granted) {
         return (
-            <View style={styles.container}>
-                <Text>Camera permission is required to use this feature</Text>
-                <CustomButton
-                    title="Grant Permission"
-                    onPress={requestPermission}
-                    style={styles.permissionButton}
+            <SafeAreaView style={styles.container}>
+                <LinearGradient 
+                    colors={["#fef2f2", "#fee2e2", "#fecaca"]} 
+                    style={styles.gradientBackground} 
                 />
-            </View>
+                <View style={styles.permissionContainer}>
+                    <View style={styles.permissionIconContainer}>
+                        <Ionicons name="camera" size={48} color="#ef4444" />
+                    </View>
+                    <Text style={styles.permissionTitle}>Camera Permission Required</Text>
+                    <Text style={styles.permissionText}>
+                        This feature requires camera access to capture photos of incidents.
+                    </Text>
+                    <CustomButton
+                        title="Grant Permission"
+                        onPress={requestPermission}
+                        style={styles.permissionButton}
+                    />
+                </View>
+            </SafeAreaView>
         );
     }
 
     //  Main render UI
     return (
-        <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-        >
-            <View style={styles.container}>
-                {/* Enhanced Background with animated gradient */}
+        <SafeAreaView style={styles.container}>
+            <KeyboardAvoidingView 
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={{ flex: 1 }}
+            >
+                {/* Professional Background */}
                 <LinearGradient 
-                    colors={["#fff1f2", "#fee2e2", "#fecaca"]} 
+                    colors={["#fef2f2", "#fee2e2", "#fecaca"]} 
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.gradientBackground} 
-                />
-                <Animated.View 
-                    entering={FadeIn.duration(1000)}
-                    style={styles.floatingDecoration} 
-                />
-                <Animated.View 
-                    entering={FadeIn.duration(1000).delay(200)}
-                    style={styles.floatingDecoration2} 
                 />
 
                 {/* Camera View */}
                 {cameraVisible ? (
                     <View style={styles.cameraContainer}>
                         <CameraView style={styles.camera} ref={cameraRef} facing={facing}>
+                            <View style={styles.cameraHeader}>
+                                <TouchableOpacity 
+                                    style={styles.closeButton} 
+                                    onPress={() => setCameraVisible(false)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="close" size={24} color="white" />
+                                </TouchableOpacity>
+                                <Text style={styles.cameraTitle}>Take Photo</Text>
+                                <TouchableOpacity 
+                                    style={styles.flipButton} 
+                                    onPress={toggleCameraType}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons name="camera-reverse-outline" size={24} color="white" />
+                                </TouchableOpacity>
+                            </View>
                             <View style={styles.cameraControls}>
                                 <TouchableOpacity 
                                     style={styles.cameraButton} 
@@ -284,222 +305,158 @@ const IncidentReportScreen = () => {
                                 >
                                     <View style={styles.cameraButtonInner} />
                                 </TouchableOpacity>
-                                <TouchableOpacity 
-                                    style={styles.flipButton} 
-                                    onPress={toggleCameraType}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="camera-reverse-outline" size={24} color="white" />
-                                </TouchableOpacity>
-                                <TouchableOpacity 
-                                    style={styles.closeButton} 
-                                    onPress={() => setCameraVisible(false)}
-                                    activeOpacity={0.7}
-                                >
-                                    <Ionicons name="close" size={24} color="white" />
-                                </TouchableOpacity>
                             </View>
                         </CameraView>
                     </View>
                 ) : (
-                    <ScrollView 
-                        contentContainerStyle={styles.scrollContainer}
-                        showsVerticalScrollIndicator={false}
-                    >
-                        {/* Enhanced Form Header */}
+                    <View style={styles.mainContainer}>
+                        {/* Compact Header */}
                         <Animated.View 
                             entering={FadeInDown.duration(800).springify()}
                             style={styles.header}
                         >
-                            <View style={styles.iconContainer}>
+                            <View style={styles.headerIconContainer}>
                                 <LinearGradient
                                     colors={['#ef4444', '#dc2626']}
-                                    style={styles.iconBackground}
+                                    style={styles.headerIconBackground}
                                 >
-                                    <Image source={images.warning} style={styles.icon} resizeMode="contain" />
+                                    <Ionicons name="warning" size={24} color="white" />
                                 </LinearGradient>
                             </View>
-                            <Text style={styles.heading}>Incident Report</Text>
-                            <Text style={styles.subheading}>
-                                Please provide accurate details about the incident you're reporting
-                            </Text>
+                            <Text style={styles.headerTitle}>Incident Report</Text>
                         </Animated.View>
 
-                        {/* Enhanced Title Input */}
+                        {/* Compact Form Container */}
                         <Animated.View 
-                            entering={FadeInDown.duration(800).delay(100).springify()}
-                            style={styles.inputContainer}
+                            entering={FadeInUp.duration(800).delay(200).springify()}
+                            style={styles.formContainer}
                         >
-                            <Text style={styles.label}>Incident Title</Text>
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: '#e2e8f0',
-                                paddingHorizontal: 12,
-                            }}>
-                                <Ionicons name="document-text-outline" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Enter incident title..."
-                                    placeholderTextColor="#94a3b8"
-                                    value={title}
-                                    onChangeText={setTitle}
-                                />
-                            </View>
-                        </Animated.View>
-
-                        {/* Enhanced Camera Section */}
-                        <Animated.View 
-                            entering={FadeInDown.duration(800).delay(200).springify()}
-                            style={styles.inputContainer}
-                        >
-                            <Text style={styles.label}>Take Photo</Text>
-                            <TouchableOpacity 
-                                style={styles.uploadButton} 
-                                onPress={() => setCameraVisible(true)}
-                                activeOpacity={0.8}
-                            >
-                                <Ionicons name="camera-outline" size={24} color="#ef4444" />
-                                <Text style={styles.uploadButtonText}>Open Camera</Text>
-                            </TouchableOpacity>
-                            {media && (
-                                <Animated.View 
-                                    entering={FadeIn.duration(300)}
-                                    style={{
-                                        marginTop: 16,
-                                        borderRadius: 12,
-                                        overflow: 'hidden',
-                                        position: 'relative',
-                                    }}
-                                >
-                                    <Image
-                                        source={{ uri: media.uri }}
-                                        style={styles.mediaPreview}
-                                        resizeMode="cover"
+                            {/* Title Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Title *</Text>
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons name="document-text-outline" size={18} color="#94a3b8" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={styles.textInput}
+                                        placeholder="Enter incident title"
+                                        placeholderTextColor="#94a3b8"
+                                        value={title}
+                                        onChangeText={setTitle}
                                     />
-                                    <TouchableOpacity 
-                                        style={{
-                                            position: 'absolute',
-                                            top: 8,
-                                            right: 8,
-                                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                                            borderRadius: 12,
-                                            padding: 4,
-                                        }}
-                                        onPress={() => setMedia(null)}
-                                    >
-                                        <Ionicons name="close-circle" size={24} color="white" />
-                                    </TouchableOpacity>
-                                </Animated.View>
-                            )}
-                        </Animated.View>
-
-                        {/* Enhanced Description Input */}
-                        <Animated.View 
-                            entering={FadeInDown.duration(800).delay(300).springify()}
-                            style={styles.inputContainer}
-                        >
-                            <Text style={styles.label}>Description</Text>
-                            <View style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: '#f8fafc',
-                                borderRadius: 12,
-                                borderWidth: 1,
-                                borderColor: '#e2e8f0',
-                                paddingHorizontal: 12,
-                            }}>
-                                <Ionicons name="chatbubble-outline" size={20} color="#94a3b8" style={{ marginRight: 8 }} />
-                                <TextInput
-                                    style={[styles.input, styles.descriptionInput]}
-                                    multiline
-                                    placeholder="Describe the incident in detail..."
-                                    placeholderTextColor="#94a3b8"
-                                    value={description}
-                                    onChangeText={setDescription}
-                                />
+                                </View>
                             </View>
-                        </Animated.View>
 
-                        {/* Enhanced Submit Button */}
-                        <Animated.View 
-                            entering={FadeInDown.duration(800).delay(400).springify()}
-                            style={styles.buttonContainer}
-                        >
+                            {/* Photo Section */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Photo *</Text>
+                                <TouchableOpacity 
+                                    style={styles.photoButton} 
+                                    onPress={() => setCameraVisible(true)}
+                                    activeOpacity={0.8}
+                                >
+                                    <View style={styles.photoButtonContent}>
+                                        <Ionicons name="camera-outline" size={24} color="#ef4444" />
+                                        <Text style={styles.photoButtonText}>Take Photo</Text>
+                                    </View>
+                                </TouchableOpacity>
+                                
+                                {media && (
+                                    <Animated.View 
+                                        entering={FadeIn.duration(300)}
+                                        style={styles.mediaContainer}
+                                    >
+                                        <Image
+                                            source={{ uri: media.uri }}
+                                            style={styles.mediaImage}
+                                            resizeMode="cover"
+                                        />
+                                        <TouchableOpacity 
+                                            style={styles.removeMediaButton}
+                                            onPress={() => setMedia(null)}
+                                        >
+                                            <Ionicons name="close-circle" size={20} color="white" />
+                                        </TouchableOpacity>
+                                    </Animated.View>
+                                )}
+                            </View>
+
+                            {/* Description Input */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Description *</Text>
+                                <View style={styles.inputWrapper}>
+                                    <Ionicons name="chatbubble-outline" size={18} color="#94a3b8" style={styles.inputIcon} />
+                                    <TextInput
+                                        style={[styles.textInput, styles.descriptionInput]}
+                                        multiline
+                                        placeholder="Describe the incident..."
+                                        placeholderTextColor="#94a3b8"
+                                        value={description}
+                                        onChangeText={setDescription}
+                                    />
+                                </View>
+                            </View>
+
+                            {/* Submit Button */}
                             <TouchableOpacity
                                 style={[
                                     styles.submitButton,
-                                    isSubmitting && { opacity: 0.7 }
+                                    isSubmitting && styles.submitButtonDisabled
                                 ]}
                                 onPress={handleSubmit}
                                 disabled={isSubmitting}
                                 activeOpacity={0.8}
                             >
                                 {isSubmitting ? (
-                                    <ActivityIndicator color="#ffffff" />
+                                    <ActivityIndicator color="#ffffff" size="small" />
                                 ) : (
                                     <>
-                                        <Ionicons name="send" size={20} color="white" style={{ marginRight: 8 }} />
-                                        <Text style={styles.buttonText}>Submit Report</Text>
+                                        <Ionicons name="send" size={18} color="white" style={{ marginRight: 8 }} />
+                                        <Text style={styles.submitButtonText}>Submit Report</Text>
                                     </>
                                 )}
                             </TouchableOpacity>
                         </Animated.View>
 
-                        {/* Enhanced Warning Modal */}
+                        {/* Warning Modal */}
                         {isModalVisible && (
                             <Animated.View 
                                 entering={FadeIn.duration(300)}
                                 style={styles.modalOverlay}
                             >
                                 <View style={styles.modalContainer}>
-                                    <LinearGradient
-                                        colors={['#ef4444', '#dc2626']}
-                                        style={{
-                                            width: 80,
-                                            height: 80,
-                                            borderRadius: 40,
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            marginBottom: 20,
-                                        }}
-                                    >
-                                        <Image source={images.warning} style={styles.modalIcon} resizeMode="contain" />
-                                    </LinearGradient>
-                                    <Text style={styles.modalTitle}>Important Warning</Text>
+                                    <View style={styles.modalIconContainer}>
+                                        <Ionicons name="warning" size={32} color="white" />
+                                    </View>
+                                    <Text style={styles.modalTitle}>Important Notice</Text>
                                     <Text style={styles.modalText}>
-                                        Submitting a false incident report can have serious legal
-                                        consequences. Please ensure that the information you are
-                                        submitting is accurate and truthful.
+                                        Submitting a false incident report may result in legal consequences. 
+                                        Please ensure all information provided is accurate and truthful.
                                     </Text>
 
-                                    <View style={{ width: '100%', gap: 12 }}>
-                                        <CustomButton
-                                            title="I Understand - Proceed"
+                                    <View style={styles.modalButtons}>
+                                        <TouchableOpacity
+                                            style={styles.modalConfirmButton}
                                             onPress={handleModalConfirm}
-                                            bgVariant="primary"
-                                            textVariant="default"
-                                            style={{ width: '100%', marginBottom: 12 }}
-                                        />
-
-                                        <CustomButton
-                                            title="Cancel Report"
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.modalConfirmText}>I Understand - Continue</Text>
+                                        </TouchableOpacity>
+                                        
+                                        <TouchableOpacity
+                                            style={styles.modalCancelButton}
                                             onPress={handleModalCancel}
-                                            bgVariant="danger"
-                                            textVariant="default"
-                                            style={{ width: '100%' }}
-                                        />
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.modalCancelText}>Cancel</Text>
+                                        </TouchableOpacity>
                                     </View>
                                 </View>
                             </Animated.View>
                         )}
-                    </ScrollView>
+                    </View>
                 )}
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 };
 

@@ -1,17 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
     TouchableOpacity,
-    ScrollView,
     ActivityIndicator,
     Alert,
     Modal,
     TextInput,
-    Image,
-    Dimensions,
-    NativeScrollEvent,
-    NativeSyntheticEvent
+    Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,10 +18,7 @@ import axios from 'axios';
 import Animated, { 
     FadeInDown, 
     FadeIn, 
-    useAnimatedStyle, 
-    withSpring,
-    interpolate,
-    useSharedValue
+    FadeInRight
 } from 'react-native-reanimated';
 import { styles } from '@/styles/profile_styles';
 import { useTabBarVisibility } from './_layout';
@@ -47,12 +40,11 @@ const Profile = () => {
     const { setIsTabBarVisible } = useTabBarVisibility();
     const [logoutModalVisible, setLogoutModalVisible] = useState(false);
     const [editModalVisible, setEditModalVisible] = useState(false);
+    const [settingsModalVisible, setSettingsModalVisible] = useState(false);
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
-    const lastScrollY = useRef(0);
-    const scrollY = useSharedValue(0);
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -114,40 +106,54 @@ const Profile = () => {
         }
     };
 
-    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const currentScrollY = event.nativeEvent.contentOffset.y;
-        scrollY.value = currentScrollY;
-        
-        // Show tab bar when scrolling up, hide when scrolling down
-        if (currentScrollY < lastScrollY.current) {
-            setIsTabBarVisible(true);
-        } else if (currentScrollY > 50) { // Reduced threshold to make it more sensitive
-            setIsTabBarVisible(false);
-        }
-        
-        lastScrollY.current = currentScrollY;
-    };
-
     if (loading) {
         return (
-            <SafeAreaView style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#3b82f6" />
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#667eea" />
+                <Text style={{ color: '#6b7280', fontSize: 16, marginTop: 16, fontWeight: '500' }}>Loading profile...</Text>
             </SafeAreaView>
         );
     }
 
     if (error) {
         return (
-            <SafeAreaView style={[styles.container, styles.loadingContainer]}>
-                <Text style={styles.errorText}>{error}</Text>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: '#fef2f2',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: 16,
+                    shadowColor: '#ef4444',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 2,
+                }}>
+                    <Ionicons name="alert-circle" size={32} color="#ef4444" />
+                </View>
+                <Text style={{ color: '#1f2937', fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Error Loading Profile</Text>
+                <Text style={{ color: '#6b7280', fontSize: 14, textAlign: 'center', marginBottom: 24 }}>{error}</Text>
                 <TouchableOpacity
-                    style={[styles.optionButton, { marginTop: 20 }]}
+                    style={{
+                        backgroundColor: '#667eea',
+                        paddingHorizontal: 24,
+                        paddingVertical: 12,
+                        borderRadius: 12,
+                        shadowColor: '#667eea',
+                        shadowOffset: { width: 0, height: 4 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 8,
+                        elevation: 4,
+                    }}
                     onPress={() => {
                         setLoading(true);
                         setError(null);
                     }}
                 >
-                    <Text style={styles.optionText}>Retry</Text>
+                    <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '600' }}>Retry</Text>
                 </TouchableOpacity>
             </SafeAreaView>
         );
@@ -155,139 +161,438 @@ const Profile = () => {
 
     if (!user) {
         return (
-            <SafeAreaView style={[styles.container, styles.loadingContainer]}>
-                <Text style={styles.emptyText}>No user data available</Text>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ color: '#6b7280', fontSize: 16 }}>No user data available</Text>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top', 'right', 'left', 'bottom']}>
             <LinearGradient
-                colors={['#e0f2fe', '#bae6fd', '#7dd3fc']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientBackground}
+                colors={['#f8fafc', '#ffffff']}
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
             />
-
-            <ScrollView 
-                contentContainerStyle={[
-                    styles.scrollContainer,
-                    { minHeight: SCREEN_HEIGHT + 200 } // Ensure content is taller than screen
-                ]}
-                showsVerticalScrollIndicator={false}
-                onScroll={handleScroll}
-                scrollEventThrottle={16}
-                bounces={true}
-            >
+            
+            <View style={{ flex: 1, paddingHorizontal: 20 }}>
+                {/* Header */}
                 <Animated.View 
-                    entering={FadeInDown.duration(600).springify()}
-                    style={styles.header}
+                    entering={FadeInDown.duration(800).springify()}
+                    style={{ alignItems: 'center', marginTop: 16, marginBottom: 24 }}
                 >
-                    <Text style={styles.headerTitle}>Profile</Text>
-                    <TouchableOpacity
-                        style={styles.editButton}
-                        onPress={handleEditProfile}
+                    <LinearGradient
+                        colors={['#667eea', '#764ba2']}
+                        style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: 30,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginBottom: 12,
+                            shadowColor: '#667eea',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: 0.2,
+                            shadowRadius: 16,
+                            elevation: 8,
+                        }}
                     >
-                        <Feather name="edit" size={24} color="#3b82f6" />
-                    </TouchableOpacity>
+                        <Ionicons name="person" size={28} color="#ffffff" />
+                    </LinearGradient>
+                    <Text style={{ 
+                        fontSize: 28, 
+                        fontWeight: '800', 
+                        color: '#1f2937', 
+                        marginBottom: 6,
+                        letterSpacing: -0.5
+                    }}>
+                        Profile
+                    </Text>
+                    <Text style={{ 
+                        fontSize: 15, 
+                        color: '#6b7280',
+                        textAlign: 'center',
+                        lineHeight: 20,
+                        fontWeight: '400'
+                    }}>
+                        Manage your account and preferences
+                    </Text>
                 </Animated.View>
 
+                {/* Profile Card */}
                 <Animated.View 
                     entering={FadeInDown.duration(600).delay(100).springify()}
-                    style={styles.profileContainer}
+                    style={{
+                        backgroundColor: '#ffffff',
+                        borderRadius: 20,
+                        padding: 20,
+                        marginBottom: 20,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.08,
+                        shadowRadius: 16,
+                        elevation: 8,
+                        borderWidth: 1,
+                        borderColor: 'rgba(0, 0, 0, 0.03)',
+                    }}
                 >
-                    <View style={styles.avatarContainer}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                         <LinearGradient
-                            colors={['#3b82f6', '#60a5fa']}
-                            style={styles.avatarGradient}
+                            colors={['#667eea', '#764ba2']}
+                            style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 28,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginRight: 16,
+                                shadowColor: '#667eea',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 8,
+                                elevation: 4,
+                            }}
                         >
-                            <Text style={styles.avatarText}>
+                            <Text style={{ fontSize: 24, fontWeight: '700', color: '#ffffff' }}>
                                 {user.name.charAt(0).toUpperCase()}
                             </Text>
                         </LinearGradient>
+                        
+                        <View style={{ flex: 1 }}>
+                            <Text style={{ 
+                                fontSize: 20, 
+                                fontWeight: '700', 
+                                color: '#1f2937',
+                                marginBottom: 4,
+                                letterSpacing: -0.3
+                            }}>
+                                {user.name}
+                            </Text>
+                            <Text style={{ 
+                                color: '#6b7280', 
+                                fontSize: 14,
+                                fontWeight: '500'
+                            }}>
+                                ID: {user.clerk_id.slice(-8)}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 20,
+                                backgroundColor: '#f8fafc',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 4,
+                                elevation: 2,
+                            }}
+                            onPress={handleEditProfile}
+                        >
+                            <Feather name="edit" size={18} color="#667eea" />
+                        </TouchableOpacity>
                     </View>
 
-                    <Text style={styles.name}>{user.name}</Text>
-                    <Text style={styles.phone}>ID: {user.clerk_id}</Text>
-
-                    <View style={styles.statsContainer}>
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>{user.requests_completed}</Text>
-                            <Text style={styles.statLabel}>Completed</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>{user.requests_pending}</Text>
-                            <Text style={styles.statLabel}>Pending</Text>
-                        </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                            <Text style={styles.statValue}>
-                                {new Date(user.member_since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    {/* Stats Row */}
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        backgroundColor: '#f8fafc',
+                        borderRadius: 16,
+                        padding: 16,
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.05,
+                        shadowRadius: 4,
+                        elevation: 2,
+                    }}>
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ 
+                                fontSize: 24, 
+                                fontWeight: '800', 
+                                color: '#10b981',
+                                marginBottom: 4
+                            }}>
+                                {user.requests_completed}
                             </Text>
-                            <Text style={styles.statLabel}>Member Since</Text>
+                            <Text style={{ 
+                                color: '#6b7280', 
+                                fontSize: 12,
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5
+                            }}>
+                                Completed
+                            </Text>
+                        </View>
+                        
+                        <View style={{ 
+                            width: 1, 
+                            backgroundColor: '#e5e7eb',
+                            marginHorizontal: 8
+                        }} />
+                        
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ 
+                                fontSize: 24, 
+                                fontWeight: '800', 
+                                color: '#f59e0b',
+                                marginBottom: 4
+                            }}>
+                                {user.requests_pending}
+                            </Text>
+                            <Text style={{ 
+                                color: '#6b7280', 
+                                fontSize: 12,
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5
+                            }}>
+                                Pending
+                            </Text>
+                        </View>
+                        
+                        <View style={{ 
+                            width: 1, 
+                            backgroundColor: '#e5e7eb',
+                            marginHorizontal: 8
+                        }} />
+                        
+                        <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ 
+                                fontSize: 16, 
+                                fontWeight: '700', 
+                                color: '#667eea',
+                                marginBottom: 4
+                            }}>
+                                {new Date(user.member_since).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    year: 'numeric' 
+                                })}
+                            </Text>
+                            <Text style={{ 
+                                color: '#6b7280', 
+                                fontSize: 12,
+                                fontWeight: '600',
+                                textTransform: 'uppercase',
+                                letterSpacing: 0.5
+                            }}>
+                                Member Since
+                            </Text>
                         </View>
                     </View>
                 </Animated.View>
 
+                {/* Quick Actions */}
                 <Animated.View 
                     entering={FadeInDown.duration(600).delay(200).springify()}
-                    style={styles.sectionContainer}
+                    style={{ marginBottom: 20 }}
                 >
-                    <Text style={styles.sectionTitle}>Account Settings</Text>
+                    <Text style={{ 
+                        fontSize: 18, 
+                        fontWeight: '700', 
+                        color: '#1f2937',
+                        marginBottom: 16,
+                        letterSpacing: -0.3
+                    }}>
+                        Quick Actions
+                    </Text>
 
-                    <TouchableOpacity style={styles.optionButton}>
-                        <View style={styles.optionTextContainer}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="notifications-outline" size={24} color="#3b82f6" />
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        gap: 12,
+                        marginBottom: 16
+                    }}>
+                        <TouchableOpacity style={{
+                            flex: 1,
+                            backgroundColor: '#ffffff',
+                            borderRadius: 16,
+                            padding: 20,
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.08,
+                            shadowRadius: 8,
+                            elevation: 4,
+                            borderWidth: 1,
+                            borderColor: 'rgba(0, 0, 0, 0.03)',
+                        }}>
+                            <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#f0f9ff',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}>
+                                <Ionicons name="notifications-outline" size={24} color="#0ea5e9" />
                             </View>
-                            <Text style={styles.optionText}>Notification Settings</Text>
-                        </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-                    </TouchableOpacity>
+                            <Text style={{ 
+                                color: '#1f2937', 
+                                fontSize: 14,
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}>
+                                Notifications
+                            </Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.optionButton}>
-                        <View style={styles.optionTextContainer}>
-                            <View style={styles.iconContainer}>
-                                <MaterialCommunityIcons name="shield-account" size={24} color="#3b82f6" />
+                        <TouchableOpacity style={{
+                            flex: 1,
+                            backgroundColor: '#ffffff',
+                            borderRadius: 16,
+                            padding: 20,
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.08,
+                            shadowRadius: 8,
+                            elevation: 4,
+                            borderWidth: 1,
+                            borderColor: 'rgba(0, 0, 0, 0.03)',
+                        }}>
+                            <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#fef3c7',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}>
+                                <MaterialCommunityIcons name="shield-account" size={24} color="#f59e0b" />
                             </View>
-                            <Text style={styles.optionText}>Privacy & Security</Text>
-                        </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-                    </TouchableOpacity>
+                            <Text style={{ 
+                                color: '#1f2937', 
+                                fontSize: 14,
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}>
+                                Privacy
+                            </Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.optionButton}>
-                        <View style={styles.optionTextContainer}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="help-circle-outline" size={24} color="#3b82f6" />
+                        <TouchableOpacity style={{
+                            flex: 1,
+                            backgroundColor: '#ffffff',
+                            borderRadius: 16,
+                            padding: 20,
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.08,
+                            shadowRadius: 8,
+                            elevation: 4,
+                            borderWidth: 1,
+                            borderColor: 'rgba(0, 0, 0, 0.03)',
+                        }}>
+                            <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#f0fdf4',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}>
+                                <Ionicons name="help-circle-outline" size={24} color="#10b981" />
                             </View>
-                            <Text style={styles.optionText}>Help & Support</Text>
-                        </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-                    </TouchableOpacity>
+                            <Text style={{ 
+                                color: '#1f2937', 
+                                fontSize: 14,
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}>
+                                Help
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
 
-                    <TouchableOpacity style={styles.optionButton}>
-                        <View style={styles.optionTextContainer}>
-                            <View style={styles.iconContainer}>
-                                <Ionicons name="information-circle-outline" size={24} color="#3b82f6" />
+                    <View style={{ 
+                        flexDirection: 'row', 
+                        gap: 12
+                    }}>
+                        <TouchableOpacity 
+                            style={{
+                                flex: 1,
+                                backgroundColor: '#ffffff',
+                                borderRadius: 16,
+                                padding: 20,
+                                alignItems: 'center',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.08,
+                                shadowRadius: 8,
+                                elevation: 4,
+                                borderWidth: 1,
+                                borderColor: 'rgba(0, 0, 0, 0.03)',
+                            }}
+                            onPress={() => setSettingsModalVisible(true)}
+                        >
+                            <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#f8fafc',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}>
+                                <Ionicons name="settings-outline" size={24} color="#667eea" />
                             </View>
-                            <Text style={styles.optionText}>About</Text>
-                        </View>
-                        <MaterialIcons name="chevron-right" size={24} color="#94a3b8" />
-                    </TouchableOpacity>
+                            <Text style={{ 
+                                color: '#1f2937', 
+                                fontSize: 14,
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}>
+                                Settings
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity 
+                            style={{
+                                flex: 1,
+                                backgroundColor: '#ffffff',
+                                borderRadius: 16,
+                                padding: 20,
+                                alignItems: 'center',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.08,
+                                shadowRadius: 8,
+                                elevation: 4,
+                                borderWidth: 1,
+                                borderColor: 'rgba(0, 0, 0, 0.03)',
+                            }}
+                            onPress={showLogoutConfirmation}
+                        >
+                            <View style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: 24,
+                                backgroundColor: '#fef2f2',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}>
+                                <Ionicons name="log-out-outline" size={24} color="#ef4444" />
+                            </View>
+                            <Text style={{ 
+                                color: '#ef4444', 
+                                fontSize: 14,
+                                fontWeight: '600',
+                                textAlign: 'center'
+                            }}>
+                                Log Out
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </Animated.View>
-
-                <SafeAreaView edges={['bottom']} style={styles.bottomContainer}>
-                    <TouchableOpacity
-                        style={styles.logoutButton}
-                        onPress={showLogoutConfirmation}
-                    >
-                        <Ionicons name="log-out-outline" size={20} color="#ef4444" />
-                        <Text style={styles.logoutText}>Log Out</Text>
-                    </TouchableOpacity>
-                </SafeAreaView>
-            </ScrollView>
+            </View>
 
             {/* Logout Confirmation Modal */}
             <Modal
@@ -296,33 +601,99 @@ const Profile = () => {
                 visible={logoutModalVisible}
                 onRequestClose={() => setLogoutModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 20,
+                }}>
                     <Animated.View 
                         entering={FadeIn.duration(200)}
-                        style={styles.modalContainer}
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: 20,
+                            padding: 24,
+                            width: '100%',
+                            maxWidth: 320,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 20 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 25,
+                            elevation: 10,
+                        }}
                     >
-                        <View style={styles.modalIconContainer}>
-                            <Ionicons name="warning" size={48} color="#f59e0b" />
+                        <View style={{
+                            width: 60,
+                            height: 60,
+                            borderRadius: 30,
+                            backgroundColor: '#fef3c7',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            alignSelf: 'center',
+                            marginBottom: 16,
+                        }}>
+                            <Ionicons name="warning" size={28} color="#f59e0b" />
                         </View>
-                        <Text style={styles.modalTitle}>Log Out</Text>
-                        <Text style={styles.modalText}>
-                            Are you sure you want to log out? You'll need to sign in again to
-                            access your account.
+                        <Text style={{ 
+                            fontSize: 20, 
+                            fontWeight: '700', 
+                            color: '#1f2937',
+                            textAlign: 'center',
+                            marginBottom: 8,
+                        }}>
+                            Log Out
                         </Text>
-                        <View style={styles.modalButtons}>
+                        <Text style={{ 
+                            color: '#6b7280', 
+                            fontSize: 14,
+                            textAlign: 'center',
+                            lineHeight: 20,
+                            marginBottom: 24,
+                        }}>
+                            Are you sure you want to log out? You'll need to sign in again to access your account.
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
                             <TouchableOpacity
-                                style={[styles.modalButton, styles.modalCancelButton]}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    alignItems: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#e5e7eb',
+                                }}
                                 onPress={() => setLogoutModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, styles.modalCancelText]}>
+                                <Text style={{ 
+                                    color: '#6b7280', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
                                     Cancel
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, styles.modalConfirmButton]}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#ef4444',
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    alignItems: 'center',
+                                    shadowColor: '#ef4444',
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.2,
+                                    shadowRadius: 8,
+                                    elevation: 4,
+                                }}
                                 onPress={handleLogout}
                             >
-                                <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
+                                <Text style={{ 
+                                    color: '#ffffff', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
                                     Log Out
                                 </Text>
                             </TouchableOpacity>
@@ -338,37 +709,280 @@ const Profile = () => {
                 visible={editModalVisible}
                 onRequestClose={() => setEditModalVisible(false)}
             >
-                <View style={styles.modalOverlay}>
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 20,
+                }}>
                     <Animated.View 
                         entering={FadeInDown.duration(300).springify()}
-                        style={styles.modalContainer}
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: 20,
+                            padding: 24,
+                            width: '100%',
+                            maxWidth: 320,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 20 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 25,
+                            elevation: 10,
+                        }}
                     >
-                        <Text style={styles.modalTitle}>Edit Profile</Text>
-                        <View style={styles.inputContainer}>
+                        <Text style={{ 
+                            fontSize: 20, 
+                            fontWeight: '700', 
+                            color: '#1f2937',
+                            textAlign: 'center',
+                            marginBottom: 20,
+                        }}>
+                            Edit Profile
+                        </Text>
+                        <View style={{
+                            backgroundColor: '#f8fafc',
+                            borderRadius: 12,
+                            paddingHorizontal: 16,
+                            paddingVertical: 12,
+                            marginBottom: 24,
+                            borderWidth: 1,
+                            borderColor: '#e5e7eb',
+                        }}>
                             <TextInput
-                                style={styles.input}
+                                style={{
+                                    fontSize: 16,
+                                    color: '#1f2937',
+                                    fontWeight: '500',
+                                }}
                                 value={tempName}
                                 onChangeText={setTempName}
                                 placeholder="Enter your name"
-                                placeholderTextColor="#94a3b8"
+                                placeholderTextColor="#9ca3af"
                             />
                         </View>
-                        <View style={styles.modalButtons}>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
                             <TouchableOpacity
-                                style={[styles.modalButton, styles.modalCancelButton]}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#f8fafc',
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    alignItems: 'center',
+                                    borderWidth: 1,
+                                    borderColor: '#e5e7eb',
+                                }}
                                 onPress={() => setEditModalVisible(false)}
                             >
-                                <Text style={[styles.modalButtonText, styles.modalCancelText]}>
+                                <Text style={{ 
+                                    color: '#6b7280', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
                                     Cancel
                                 </Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.modalButton, styles.modalConfirmButton]}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#667eea',
+                                    borderRadius: 12,
+                                    paddingVertical: 12,
+                                    alignItems: 'center',
+                                    shadowColor: '#667eea',
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.2,
+                                    shadowRadius: 8,
+                                    elevation: 4,
+                                }}
                                 onPress={handleUpdateProfile}
                             >
-                                <Text style={[styles.modalButtonText, styles.modalConfirmText]}>
+                                <Text style={{ 
+                                    color: '#ffffff', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
                                     Save
                                 </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
+
+            {/* Settings Modal */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={settingsModalVisible}
+                onRequestClose={() => setSettingsModalVisible(false)}
+            >
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 20,
+                }}>
+                    <Animated.View 
+                        entering={FadeInDown.duration(300).springify()}
+                        style={{
+                            backgroundColor: '#ffffff',
+                            borderRadius: 20,
+                            padding: 24,
+                            width: '100%',
+                            maxWidth: 320,
+                            maxHeight: 400,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 20 },
+                            shadowOpacity: 0.25,
+                            shadowRadius: 25,
+                            elevation: 10,
+                        }}
+                    >
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: 20,
+                        }}>
+                            <Text style={{ 
+                                fontSize: 20, 
+                                fontWeight: '700', 
+                                color: '#1f2937',
+                            }}>
+                                Settings
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => setSettingsModalVisible(false)}
+                                style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 16,
+                                    backgroundColor: '#f8fafc',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Ionicons name="close" size={20} color="#6b7280" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ gap: 12 }}>
+                            <TouchableOpacity style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: 12,
+                                padding: 16,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}>
+                                <View style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    backgroundColor: '#f0f9ff',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 12,
+                                }}>
+                                    <Ionicons name="notifications-outline" size={20} color="#0ea5e9" />
+                                </View>
+                                <Text style={{ 
+                                    flex: 1,
+                                    color: '#1f2937', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    Notification Settings
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: 12,
+                                padding: 16,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}>
+                                <View style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    backgroundColor: '#fef3c7',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 12,
+                                }}>
+                                    <MaterialCommunityIcons name="shield-account" size={20} color="#f59e0b" />
+                                </View>
+                                <Text style={{ 
+                                    flex: 1,
+                                    color: '#1f2937', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    Privacy & Security
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: 12,
+                                padding: 16,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}>
+                                <View style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    backgroundColor: '#f0fdf4',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 12,
+                                }}>
+                                    <Ionicons name="help-circle-outline" size={20} color="#10b981" />
+                                </View>
+                                <Text style={{ 
+                                    flex: 1,
+                                    color: '#1f2937', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    Help & Support
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={{
+                                backgroundColor: '#f8fafc',
+                                borderRadius: 12,
+                                padding: 16,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                            }}>
+                                <View style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    backgroundColor: '#f8fafc',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    marginRight: 12,
+                                }}>
+                                    <Ionicons name="information-circle-outline" size={20} color="#667eea" />
+                                </View>
+                                <Text style={{ 
+                                    flex: 1,
+                                    color: '#1f2937', 
+                                    fontSize: 16,
+                                    fontWeight: '600'
+                                }}>
+                                    About App
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
                             </TouchableOpacity>
                         </View>
                     </Animated.View>

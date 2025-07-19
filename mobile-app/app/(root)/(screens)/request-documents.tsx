@@ -1,57 +1,87 @@
-import React, { useState } from "react";
-import { View, Text, Alert, ScrollView, Image, TouchableOpacity, Platform, ActivityIndicator } from "react-native";
+import React from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions,
+  Modal,
+} from "react-native";
+import { useState, useRef } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Picker } from "@react-native-picker/picker";
 import { useRouter } from "expo-router";
-import CustomButton from "@/components/CustomButton";
-import { styles } from "@/styles/rd_styles";
 import axios from "axios";
 import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
-import * as LocalAuthentication from 'expo-local-authentication';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { 
+  FadeInDown, 
+  SlideInRight,
+  SlideOutLeft,
+} from 'react-native-reanimated';
+import { styles } from "@/styles/rd_styles";
+import ConfirmationModal from "@/components/ConfirmationModal";
 
-// Define the structure of the data to be submitted
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface RequestData {
   type: string;
   document_type: string;
   reason: string;
-  clerk_id: string;
-  created_at?: string;
-  status?: string;
+  clerk_id: string | null;
 }
 
-// Component for handling document request form
 const RequestDocumentsScreen = () => {
-  const router = useRouter(); // For navigating between screens
-  const { userId } = useAuth(); // Get logged-in user's ID
-
-  // Store selected document type
-  const [selectedDocumentType, setSelectedDocumentType] = useState<string>("residency");
-
-  // Store selected reason for the request
-  const [selectedReason, setSelectedReason] = useState<string>("job");
-
-  // Tracks loading state during form submission
-  const [loading, setLoading] = useState<boolean>(false);
-
-  // Tracks the last submission time
+  const router = useRouter();
+  const { userId } = useAuth();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [documentType, setDocumentType] = useState("");
+  const [reason, setReason] = useState("");
+  const [otherReason, setOtherReason] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showDocumentDropdown, setShowDocumentDropdown] = useState(false);
+  const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
   const [lastSubmitted, setLastSubmitted] = useState<number | null>(null);
 
+  const totalSteps = 2;
+
+  const documentTypes = [
+    "Barangay Clearance",
+    "Certificate of Residency",
+    "Certificate of Indigency",
+    "Certificate of Good Moral Character",
+    "Certificate of Employment",
+    "Certificate of No Pending Case",
+    "Other"
+  ];
+
+  const reasons = [
+    "Job Application",
+    "School Requirements",
+    "Financial Assistance",
+    "Medical Purposes",
+    "Government Transaction",
+    "Business Permit",
+    "Other"
+  ];
+
   // Validation helpers
-  const isValidDocumentType = (doc: string) => ["residency", "indigency", "clearance"].includes(doc);
-  const isValidReason = (reason: string) => ["job", "school", "financial", "medical", "other"].includes(reason);
+  const isValidDocumentType = (type: string) => type.trim().length > 0;
 
   const canSubmit = () => {
-    if (!isValidDocumentType(selectedDocumentType)) {
-      Alert.alert("Invalid Document Type", "Please select a valid document type.");
-      return false;
-    }
-    if (!isValidReason(selectedReason)) {
-      Alert.alert("Invalid Reason", "Please select a valid reason for your request.");
-      return false;
-    }
+    // No validation - allow free submission
+    return true;
+  };
+
+  const canProceedToNextStep = () => {
+    // No validation for document type - allow free selection
     return true;
   };
 
@@ -61,210 +91,359 @@ const RequestDocumentsScreen = () => {
       Alert.alert("Please wait", "You can only submit a request every 30 seconds.");
       return;
     }
-    Alert.alert(
-      'Confirm Submission',
-      'Are you sure all information is correct? Submitting false information is punishable.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit', onPress: handleBiometricAuth }
-      ]
-    );
+    setShowConfirmation(true);
   };
 
-  const handleBiometricAuth = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert('Biometric authentication not available', 'Your device does not support biometrics or no biometrics are enrolled.');
-        return;
-      }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to submit your request',
-        fallbackLabel: 'Enter device passcode',
-        cancelLabel: 'Cancel',
-      });
-      if (result.success) {
-        handleSubmit();
-      } else {
-        Alert.alert('Authentication Failed', 'Biometric authentication was not successful.');
-      }
-    } catch (error) {
-      Alert.alert('Authentication Error', 'An error occurred during biometric authentication.');
-    }
-  };
-
-  // Handles form submission logic
-  const handleSubmit = async () => {
+  const handleConfirmSubmit = async () => {
     if (!canSubmit()) return;
     if (!userId) {
-      Alert.alert("Authentication Error", "User not authenticated. Please log in again.");
+      Alert.alert("Authentication Error", "You must be logged in to submit a request.");
       return;
     }
+    const finalReason = reason === "Other" ? otherReason : reason;
     const requestData: RequestData = {
       type: "Document Request",
-      document_type: selectedDocumentType,
-      reason: selectedReason,
+      document_type: documentType,
+      reason: finalReason,
       clerk_id: userId,
     };
     try {
       setLoading(true);
       const response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/requests`, requestData);
       setLastSubmitted(Date.now());
+      setShowConfirmation(false);
       router.replace({
         pathname: "/details",
         params: {
           ...response.data,
-          type: "Document Request",
-          document_type: selectedDocumentType,
-          reason: selectedReason,
-          clerk_id: userId,
-          created_at: response.data.created_at || new Date().toISOString(),
-          status: "pending",
           fromSubmission: 'true'
-        } as never
+        },
       });
-    } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.message || "There was an error submitting your request.");
+    } catch (error) {
+      console.error("Submission error:", error);
+      Alert.alert(
+        "Error",
+        "Something went wrong while submitting your request.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
+  const handleEdit = () => {
+    setShowConfirmation(false);
+  };
+
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(prev => prev + 1);
+      scrollViewRef.current?.scrollTo({ x: currentStep * SCREEN_WIDTH, animated: true });
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1);
+      scrollViewRef.current?.scrollTo({ x: (currentStep - 2) * SCREEN_WIDTH, animated: true });
+    }
+  };
+
+  // Prepare data for confirmation modal
+  const confirmationData = {
+    document_type: documentType,
+    reason: reason === "Other" ? otherReason : reason,
+  };
+
+  const dataLabels = {
+    document_type: "Document Type",
+    reason: "Reason",
+  };
+
+  const renderProgressBar = () => (
+    <Animated.View 
+      entering={FadeInDown.duration(600)}
+      style={styles.progressContainer}
+    >
+      <View style={styles.progressBar}>
+        <View style={[styles.progressFill, { width: `${(currentStep / totalSteps) * 100}%` }]} />
+      </View>
+      <View style={styles.stepLabels}>
+        <Text style={[styles.stepLabel, currentStep >= 1 && styles.stepLabelActive]}>Document Type</Text>
+        <Text style={[styles.stepLabel, currentStep >= 2 && styles.stepLabelActive]}>Reason</Text>
+      </View>
+    </Animated.View>
+  );
+
+  const renderStepContent = () => (
+    <ScrollView
+      ref={scrollViewRef}
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      scrollEnabled={false}
+      style={styles.stepsContainer}
+    >
+      {/* Step 1: Document Type */}
+      <View style={[styles.stepContent, { width: SCREEN_WIDTH }]}>
+        <Animated.View 
+          entering={SlideInRight.duration(400)}
+          exiting={SlideOutLeft.duration(400)}
+          style={styles.mainCard}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.iconWrapper}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.iconGradient}
+              >
+                <Ionicons name="document-text" size={32} color="white" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.cardTitle}>Select Document Type</Text>
+            <Text style={styles.cardSubtitle}>
+              Choose the type of document you need from the barangay
+            </Text>
+          </View>
+
+          <View style={styles.inputSection}>
+            <Text style={styles.inputLabel}>Document Type</Text>
+            <TouchableOpacity
+              style={styles.pickerContainer}
+              onPress={() => setShowDocumentDropdown(true)}
+            >
+              <Text style={[
+                styles.picker,
+                !documentType && { color: '#9ca3af' }
+              ]}>
+                {documentType || "Select a document type..."}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+
+      {/* Step 2: Reason */}
+      <View style={[styles.stepContent, { width: SCREEN_WIDTH }]}>
+        <Animated.View 
+          entering={SlideInRight.duration(400)}
+          exiting={SlideOutLeft.duration(400)}
+          style={styles.mainCard}
+        >
+          <View style={styles.cardHeader}>
+            <View style={styles.iconWrapper}>
+              <LinearGradient
+                colors={['#10b981', '#059669']}
+                style={styles.iconGradient}
+              >
+                <Ionicons name="chatbubble-ellipses" size={32} color="white" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.cardTitle}>Provide Reason</Text>
+            <Text style={styles.cardSubtitle}>
+              Please explain why you need this document
+            </Text>
+          </View>
+
+          <View style={styles.inputSection}>
+            <Text style={styles.inputLabel}>Reason for Request</Text>
+            <TouchableOpacity
+              style={styles.pickerContainer}
+              onPress={() => setShowReasonDropdown(true)}
+            >
+              <Text style={[
+                styles.picker,
+                !reason && { color: '#9ca3af' }
+              ]}>
+                {reason || "Select a reason..."}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#6b7280" />
+            </TouchableOpacity>
+            
+            {reason === "Other" && (
+              <Animated.View 
+                entering={FadeInDown.duration(300)}
+                style={{ marginTop: 16 }}
+              >
+                <Text style={styles.inputLabel}>Please specify:</Text>
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={[styles.textInput, styles.textArea]}
+                    placeholder="Enter your specific reason here..."
+                    placeholderTextColor="#9ca3af"
+                    value={otherReason}
+                    onChangeText={setOtherReason}
+                    multiline
+                    numberOfLines={3}
+                  />
+                </View>
+                <Text style={styles.inputHint}>
+                  Please provide a detailed explanation (minimum 10 characters)
+                </Text>
+              </Animated.View>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </ScrollView>
+  );
+
+  const renderNavigation = () => (
+    <View style={styles.navigationContainer}>
+      {currentStep > 1 ? (
+        <TouchableOpacity style={styles.secondaryButton} onPress={handleBack}>
+          <Ionicons name="arrow-back" size={20} color="#6b7280" />
+          <Text style={styles.secondaryButtonText}>Previous</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={{ minWidth: 100 }} />
+      )}
+
+      {currentStep < totalSteps ? (
+        <TouchableOpacity 
+          style={styles.primaryButton}
+          onPress={handleNext}
+        >
+          <Text style={styles.primaryButtonText}>Continue</Text>
+          <Ionicons name="arrow-forward" size={20} color="white" />
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity 
+          style={[
+            styles.submitButton,
+            (!canSubmit() || loading) && styles.submitButtonDisabled
+          ]} 
+          onPress={handleFinalSubmit}
+          disabled={!canSubmit() || loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="white" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle" size={20} color="white" />
+              <Text style={styles.submitButtonText}>Submit</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  const renderDropdownModal = (items: string[], selectedValue: string, onSelect: (value: string) => void, onClose: () => void, title: string, isVisible: boolean) => (
+    <Modal
+      visible={isVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.dropdownOverlay}>
+        <View style={styles.dropdownContainer}>
+          <View style={styles.dropdownHeader}>
+            <Text style={styles.dropdownTitle}>{title}</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color="#6b7280" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.dropdownList}>
+            {items.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.dropdownItem,
+                  selectedValue === item && styles.dropdownItemSelected
+                ]}
+                onPress={() => {
+                  onSelect(item);
+                  onClose();
+                }}
+              >
+                <Text style={[
+                  styles.dropdownItemText,
+                  selectedValue === item && styles.dropdownItemTextSelected
+                ]}>
+                  {item}
+                </Text>
+                {selectedValue === item && (
+                  <Ionicons name="checkmark" size={20} color="#667eea" />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Enhanced Background with animated gradient */}
-      <LinearGradient
-        colors={['#f0f9ff', '#e0f2fe', '#bae6fd']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradientBackground}
-      />
-      <Animated.View 
-        entering={FadeIn.duration(1000)}
-        style={styles.floatingDecoration} 
-      />
-      <Animated.View 
-        entering={FadeIn.duration(1000).delay(200)}
-        style={styles.floatingDecoration2} 
-      />
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        {/* Enhanced Header Section */}
-        <Animated.View 
-          entering={FadeInDown.duration(800).springify()}
-          style={styles.header}
-        >
-          <View style={styles.iconContainer}>
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
-              style={styles.iconBackground}
-            >
-              <Image
-                source={require('@/assets/images/doc_icon.png')}
-                style={styles.icon}
-                resizeMode="contain"
-              />
-            </LinearGradient>
-          </View>
-          <Text style={styles.heading}>Request Documents</Text>
-          <Text style={styles.subheading}>
-            Select the document you need from our barangay services
-          </Text>
-        </Animated.View>
+        <LinearGradient
+          colors={['#f8fafc', '#ffffff']}
+          style={styles.background}
+        />
 
-        {/* Enhanced Document Type Selection */}
-        <Animated.View 
-          entering={FadeInDown.duration(800).delay(100).springify()}
-          style={styles.cardContainer}
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
         >
-          <View style={styles.card}>
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
-              style={styles.cardGradient}
-            />
-            <View style={styles.cardContent}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="document-text-outline" size={24} color="#3b82f6" />
-                <Text style={styles.label}>Document Type</Text>
-              </View>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedDocumentType}
-                  onValueChange={setSelectedDocumentType}
-                  style={styles.picker}
-                  dropdownIconColor="#64748b"
-                >
-                  <Picker.Item label="Certificate of Residency" value="residency" />
-                  <Picker.Item label="Certificate of Indigency" value="indigency" />
-                  <Picker.Item label="Barangay Clearance" value="clearance" />
-                </Picker>
-              </View>
+          <Ionicons name="arrow-back" size={24} color="#374151" />
+        </TouchableOpacity>
+
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.titleContainer}>
+              <LinearGradient
+                colors={['#667eea', '#764ba2']}
+                style={styles.titleIcon}
+              >
+                <Ionicons name="document-text" size={24} color="white" />
+              </LinearGradient>
+              <Text style={styles.title}>Request Documents</Text>
             </View>
+            <Text style={styles.subtitle}>
+              Request official documents from the barangay office
+            </Text>
           </View>
-        </Animated.View>
+        </View>
 
-        {/* Enhanced Reason Selection */}
-        <Animated.View 
-          entering={FadeInDown.duration(800).delay(200).springify()}
-          style={styles.cardContainer}
-        >
-          <View style={styles.card}>
-            <LinearGradient
-              colors={['#3b82f6', '#2563eb']}
-              style={styles.cardGradient}
-            />
-            <View style={styles.cardContent}>
-              <View style={styles.cardHeader}>
-                <Ionicons name="help-circle-outline" size={24} color="#3b82f6" />
-                <Text style={styles.label}>Reason for Request</Text>
-              </View>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={selectedReason}
-                  onValueChange={setSelectedReason}
-                  style={styles.picker}
-                  dropdownIconColor="#64748b"
-                >
-                  <Picker.Item label="Job Requirement" value="job" />
-                  <Picker.Item label="School Requirement" value="school" />
-                  <Picker.Item label="Financial Assistance" value="financial" />
-                  <Picker.Item label="Medical Assistance" value="medical" />
-                  <Picker.Item label="Other Purpose" value="other" />
-                </Picker>
-              </View>
-            </View>
-          </View>
-        </Animated.View>
+        {renderProgressBar()}
+        {renderStepContent()}
+        {renderNavigation()}
 
-        {/* Enhanced Submit Button */}
-        <Animated.View 
-          entering={FadeInDown.duration(800).delay(300).springify()}
-          style={styles.buttonContainer}
-        >
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              loading && { opacity: 0.7 }
-            ]}
-            onPress={handleFinalSubmit}
-            disabled={loading}
-            activeOpacity={0.8}
-          >
-            {loading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <>
-                <Ionicons name="send" size={20} color="white" style={{ marginRight: 8 }} />
-                <Text style={styles.buttonText}>Submit Request</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </Animated.View>
-      </ScrollView>
+        {/* Document Type Dropdown Modal */}
+        {renderDropdownModal(
+          documentTypes,
+          documentType,
+          setDocumentType,
+          () => setShowDocumentDropdown(false),
+          "Select Document Type",
+          showDocumentDropdown
+        )}
+
+        {/* Reason Dropdown Modal */}
+        {renderDropdownModal(
+          reasons,
+          reason,
+          setReason,
+          () => setShowReasonDropdown(false),
+          "Select Reason",
+          showReasonDropdown
+        )}
+
+        <ConfirmationModal
+          visible={showConfirmation}
+          data={confirmationData}
+          dataLabels={dataLabels}
+          onConfirm={handleConfirmSubmit}
+          onEdit={handleEdit}
+          onClose={() => setShowConfirmation(false)}
+          loading={loading}
+          title="Document Request"
+        />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
