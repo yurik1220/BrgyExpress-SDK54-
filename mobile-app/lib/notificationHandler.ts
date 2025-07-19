@@ -60,7 +60,12 @@ export const savePushTokenToBackend = async (userId: string, token: string) => {
         });
         console.log('Token save response:', response.data);
     } catch (error) {
-        console.error('Error saving push token:', error.response?.data || error.message);
+        if (error && typeof error === 'object' && 'response' in error) {
+            const axiosError = error as any;
+            console.error('Error saving push token:', axiosError.response?.data || axiosError.message);
+        } else {
+            console.error('Error saving push token:', error);
+        }
     }
 };
 

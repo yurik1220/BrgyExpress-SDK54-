@@ -217,24 +217,75 @@ export default function AnnouncementDetail() {
         }
     };
 
+    const getPriorityConfig = (priority: string) => {
+        const priorityConfig = {
+            high: { 
+                color: '#ef4444', 
+                icon: 'alert-circle' as const, 
+                text: 'Urgent',
+                gradient: ['#ef4444', '#dc2626'],
+                bgColor: '#fef2f2',
+                borderColor: '#fecaca'
+            },
+            medium: { 
+                color: '#f59e0b', 
+                icon: 'alert' as const, 
+                text: 'Important',
+                gradient: ['#f59e0b', '#d97706'],
+                bgColor: '#fffbeb',
+                borderColor: '#fed7aa'
+            },
+            low: { 
+                color: '#10b981', 
+                icon: 'information-circle' as const, 
+                text: 'Info',
+                gradient: ['#10b981', '#059669'],
+                bgColor: '#f0fdf4',
+                borderColor: '#bbf7d0'
+            }
+        };
+
+        return priorityConfig[priority as keyof typeof priorityConfig] || priorityConfig.low;
+    };
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+        });
+    };
+
     const renderMedia = () => {
         if (!announcement?.media_url) return null;
 
         return (
             <Animated.View 
                 entering={FadeIn.duration(800)}
-                style={styles.mediaContainer}
+                style={{
+                    width: '100%',
+                    height: 200,
+                    borderRadius: 16,
+                    overflow: 'hidden',
+                    marginBottom: 20,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 4,
+                }}
             >
                 {announcement.media_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
                     <Image
                         source={{ uri: `${API_URL}${announcement.media_url}` }}
-                        style={styles.media}
+                        style={{ width: '100%', height: '100%' }}
                         resizeMode="cover"
                     />
                 ) : announcement.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
                     <Video
                         source={{ uri: `${API_URL}${announcement.media_url}` }}
-                        style={styles.media}
+                        style={{ width: '100%', height: '100%' }}
                         useNativeControls
                         resizeMode={ResizeMode.CONTAIN}
                         shouldPlay={false}
@@ -244,67 +295,41 @@ export default function AnnouncementDetail() {
         );
     };
 
-    const getPriorityStyle = () => {
-        if (!announcement) return {};
-        switch (announcement.priority) {
-            case 'high': return styles.highPriorityGradient;
-            case 'medium': return styles.mediumPriorityGradient;
-            case 'low': return styles.lowPriorityGradient;
-            default: return {};
-        }
-    };
-
-    const getPriorityBadgeStyle = () => {
-        if (!announcement) return {};
-        switch (announcement.priority) {
-            case 'high': return styles.highPriorityBadge;
-            case 'medium': return styles.mediumPriorityBadge;
-            case 'low': return styles.lowPriorityBadge;
-            default: return {};
-        }
-    };
-
-    const getPriorityTextStyle = () => {
-        if (!announcement) return {};
-        switch (announcement.priority) {
-            case 'high': return styles.highPriorityText;
-            case 'medium': return styles.mediumPriorityText;
-            case 'low': return styles.lowPriorityText;
-            default: return {};
-        }
-    };
-
-    const getPriorityIcon = () => {
-        if (!announcement) return 'information-circle';
-        switch (announcement.priority) {
-            case 'high': return 'alert-circle';
-            case 'medium': return 'alert';
-            case 'low': return 'information-circle';
-            default: return 'information-circle';
-        }
-    };
-
     const renderReactions = () => (
         <Animated.View 
             entering={FadeInDown.duration(400).delay(200)}
-            style={styles.reactionsContainer}
+            style={{ marginBottom: 24 }}
         >
             <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.reactionsScroll}
+                contentContainerStyle={{ paddingHorizontal: 20 }}
             >
                 {REACTION_TYPES.map((reaction) => (
                     <TouchableOpacity
                         key={reaction.label}
-                        style={[
-                            styles.reactionButton,
-                            userReaction === reaction.emoji && styles.activeReactionButton
-                        ]}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: userReaction === reaction.emoji ? '#667eea' : '#f8fafc',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            borderRadius: 20,
+                            marginRight: 8,
+                            shadowColor: userReaction === reaction.emoji ? '#667eea' : '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: userReaction === reaction.emoji ? 0.2 : 0.05,
+                            shadowRadius: 4,
+                            elevation: userReaction === reaction.emoji ? 3 : 1,
+                        }}
                         onPress={() => handleReaction(reaction.emoji)}
                     >
-                        <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-                        <Text style={styles.reactionCount}>
+                        <Text style={{ fontSize: 16, marginRight: 4 }}>{reaction.emoji}</Text>
+                        <Text style={{ 
+                            fontSize: 14, 
+                            fontWeight: '600', 
+                            color: userReaction === reaction.emoji ? '#ffffff' : '#4b5563'
+                        }}>
                             {reactions?.[reaction.emoji] || 0}
                         </Text>
                     </TouchableOpacity>
@@ -316,172 +341,440 @@ export default function AnnouncementDetail() {
     const renderComment = ({ item, index }: { item: Comment; index: number }) => (
         <Animated.View 
             entering={SlideInRight.duration(400).delay(index * 100)}
-            style={styles.commentContainer}
+            style={{
+                backgroundColor: '#ffffff',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 12,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 8,
+                elevation: 2,
+                borderWidth: 1,
+                borderColor: 'rgba(0, 0, 0, 0.03)',
+            }}
         >
-            <View style={styles.commentHeader}>
-                <View style={styles.commentUserInfo}>
-                    <View style={styles.userAvatar}>
-                        <Text style={styles.userInitial}>
-                            {item.name.charAt(0).toUpperCase()}
-                        </Text>
-                    </View>
-                    <View>
-                        <Text style={styles.userName}>{item.name}</Text>
-                        <Text style={styles.commentDate}>
-                            {new Date(item.created_at).toLocaleDateString()}
-                        </Text>
-                    </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: '#667eea',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                    shadowColor: '#667eea',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 4,
+                    elevation: 2,
+                }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#ffffff' }}>
+                        {item.name.charAt(0).toUpperCase()}
+                    </Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: '600', color: '#1f2937', marginBottom: 2 }}>
+                        {item.name}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#6b7280' }}>
+                        {new Date(item.created_at).toLocaleDateString()}
+                    </Text>
                 </View>
             </View>
-            <Text style={styles.commentContent}>{item.content}</Text>
+            <Text style={{ fontSize: 14, lineHeight: 20, color: '#4b5563' }}>
+                {item.content}
+            </Text>
         </Animated.View>
     );
 
     if (isLoading) {
         return (
-            <SafeAreaView style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#7F5AF0" />
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#667eea" />
+                <Text style={{ color: '#6b7280', fontSize: 16, marginTop: 16, fontWeight: '500' }}>Loading announcement...</Text>
             </SafeAreaView>
         );
     }
 
     if (!announcement) {
         return (
-            <SafeAreaView style={styles.errorContainer}>
-                <Ionicons name="alert-circle" size={48} color="#FF4D4D" />
-                <Text style={styles.errorText}>Announcement not found</Text>
+            <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff', justifyContent: 'center', alignItems: 'center' }}>
+                <View style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 40,
+                    backgroundColor: '#fef2f2',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginBottom: 16,
+                    shadowColor: '#ef4444',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 8,
+                    elevation: 2,
+                }}>
+                    <Ionicons name="alert-circle" size={32} color="#ef4444" />
+                </View>
+                <Text style={{ color: '#1f2937', fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Announcement not found</Text>
+                <Text style={{ color: '#6b7280', fontSize: 14, textAlign: 'center' }}>The announcement you're looking for doesn't exist or has been removed.</Text>
             </SafeAreaView>
         );
     }
 
+    const priorityConfig = getPriorityConfig(announcement.priority);
+
     return (
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
+            style={{ flex: 1, backgroundColor: '#ffffff' }}
         >
             <LinearGradient
-                colors={['#F8F9FF', '#F0F2FF']}
-                style={styles.backgroundGradient}
-            >
-                <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-                    <Animated.View 
-                        entering={FadeInDown.duration(400)}
-                        style={styles.header}
+                colors={['#f8fafc', '#ffffff']}
+                style={{ position: 'absolute', width: '100%', height: '100%' }}
+            />
+            
+            <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+                {/* Header */}
+                <Animated.View 
+                    entering={FadeInDown.duration(400)}
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 20,
+                        paddingVertical: 16,
+                        backgroundColor: 'transparent',
+                    }}
+                >
+                    <TouchableOpacity
+                        style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: '#ffffff',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 2 },
+                            shadowOpacity: 0.1,
+                            shadowRadius: 4,
+                            elevation: 2,
+                        }}
+                        onPress={() => router.back()}
                     >
-                        <TouchableOpacity
-                            style={styles.backButton}
-                            onPress={() => router.back()}
-                        >
-                            <Ionicons name="arrow-back" size={24} color="#7F5AF0" />
-                        </TouchableOpacity>
-                        <View style={[styles.priorityBadge, getPriorityBadgeStyle()]}>
-                            <Ionicons name={getPriorityIcon()} size={16} color="#ffffff" />
-                            <Text style={[styles.priorityText, getPriorityTextStyle()]}>
-                                {announcement.priority.toUpperCase()}
-                            </Text>
-                        </View>
-                    </Animated.View>
+                        <Ionicons name="arrow-back" size={20} color="#1f2937" />
+                    </TouchableOpacity>
+                    
+                    <View style={{
+                        backgroundColor: priorityConfig.bgColor,
+                        borderRadius: 16,
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderWidth: 1,
+                        borderColor: priorityConfig.borderColor,
+                        shadowColor: priorityConfig.color,
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.1,
+                        shadowRadius: 2,
+                        elevation: 1,
+                    }}>
+                        <Text style={{ 
+                            color: priorityConfig.color, 
+                            fontWeight: '600', 
+                            fontSize: 12,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5
+                        }}>
+                            {priorityConfig.text}
+                        </Text>
+                    </View>
+                </Animated.View>
 
-                    <FlatList
-                        ref={flatListRef}
-                        data={comments}
-                        renderItem={renderComment}
-                        keyExtractor={(item) => item.id.toString()}
-                        contentContainerStyle={styles.contentContainer}
-                        ListHeaderComponent={
-                            <>
-                                <Animated.View 
-                                    entering={FadeInDown.duration(400).delay(100)}
-                                    style={styles.announcementContainer}
-                                >
-                                    <Text style={styles.title}>{announcement.title}</Text>
-                                    {announcement.category && (
-                                        <View style={styles.categoryBadge}>
-                                            <Text style={styles.categoryText}>
-                                                {announcement.category}
+                <FlatList
+                    ref={flatListRef}
+                    data={comments}
+                    renderItem={renderComment}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={{ paddingBottom: 32 }}
+                    ListHeaderComponent={
+                        <>
+                            <Animated.View 
+                                entering={FadeInDown.duration(400).delay(100)}
+                                style={{
+                                    backgroundColor: '#ffffff',
+                                    borderRadius: 20,
+                                    padding: 20,
+                                    marginHorizontal: 20,
+                                    marginBottom: 20,
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 8 },
+                                    shadowOpacity: 0.08,
+                                    shadowRadius: 16,
+                                    elevation: 8,
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(0, 0, 0, 0.03)',
+                                }}
+                            >
+                                {/* Priority Icon */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                                    <LinearGradient
+                                        colors={priorityConfig.gradient as [string, string]}
+                                        style={{
+                                            width: 48,
+                                            height: 48,
+                                            borderRadius: 24,
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            marginRight: 14,
+                                            shadowColor: priorityConfig.color,
+                                            shadowOffset: { width: 0, height: 4 },
+                                            shadowOpacity: 0.2,
+                                            shadowRadius: 8,
+                                            elevation: 4,
+                                        }}
+                                    >
+                                        <Ionicons name={priorityConfig.icon} size={24} color="#ffffff" />
+                                    </LinearGradient>
+                                    
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={{ 
+                                            fontSize: 24, 
+                                            fontWeight: '700', 
+                                            color: '#1f2937',
+                                            marginBottom: 4,
+                                            letterSpacing: -0.3
+                                        }}>
+                                            {announcement.title}
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                            <Ionicons name="time-outline" size={12} color="#9ca3af" style={{ marginRight: 4 }} />
+                                            <Text style={{ 
+                                                color: '#6b7280', 
+                                                fontSize: 13,
+                                                fontWeight: '500'
+                                            }}>
+                                                {formatDate(announcement.created_at)}
                                             </Text>
                                         </View>
-                                    )}
-                                    {renderMedia()}
-                                    <Text style={styles.content}>{announcement.content}</Text>
-                                    <Text style={styles.date}>
-                                        {new Date(announcement.created_at).toLocaleDateString('en-US', {
-                                            month: 'long',
-                                            day: 'numeric',
-                                            year: 'numeric'
-                                        })}
-                                    </Text>
-                                </Animated.View>
-                                {renderReactions()}
-                                <View style={styles.commentsHeader}>
-                                    <Text style={styles.commentsTitle}>Comments</Text>
-                                    <Text style={styles.commentsCount}>
-                                        {comments?.length || 0} comments
-                                    </Text>
+                                    </View>
                                 </View>
-                            </>
-                        }
-                        ListEmptyComponent={
-                            <Animated.View 
-                                entering={FadeIn.duration(400)}
-                                style={styles.emptyComments}
-                            >
-                                <Ionicons name="chatbubble-outline" size={48} color="#B8C1EC" />
-                                <Text style={styles.emptyCommentsText}>No comments yet</Text>
-                                <Text style={styles.emptyCommentsSubtext}>
-                                    Be the first to share your thoughts
+
+                                {announcement.category && (
+                                    <View style={{
+                                        backgroundColor: '#f0f9ff',
+                                        borderRadius: 12,
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 6,
+                                        alignSelf: 'flex-start',
+                                        marginBottom: 16,
+                                        borderWidth: 1,
+                                        borderColor: '#bae6fd',
+                                        shadowColor: '#0ea5e9',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.05,
+                                        shadowRadius: 2,
+                                        elevation: 1,
+                                    }}>
+                                        <Text style={{ 
+                                            color: '#0ea5e9', 
+                                            fontWeight: '600', 
+                                            fontSize: 11 
+                                        }}>
+                                            {announcement.category}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                {renderMedia()}
+                                
+                                <Text style={{ 
+                                    fontSize: 16, 
+                                    lineHeight: 24, 
+                                    color: '#4b5563',
+                                    marginBottom: 16,
+                                    fontWeight: '400'
+                                }}>
+                                    {announcement.content}
                                 </Text>
                             </Animated.View>
-                        }
-                        refreshControl={
-                            <RefreshControl
-                                refreshing={refreshing}
-                                onRefresh={onRefresh}
-                                colors={['#7F5AF0']}
-                                tintColor="#7F5AF0"
-                            />
-                        }
-                    />
-
-                    {showCommentInput ? (
+                            
+                            {renderReactions()}
+                            
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 16,
+                                paddingHorizontal: 20,
+                            }}>
+                                <Text style={{ fontSize: 18, fontWeight: '700', color: '#1f2937' }}>
+                                    Comments
+                                </Text>
+                                <Text style={{ fontSize: 14, color: '#6b7280', fontWeight: '500' }}>
+                                    {comments?.length || 0} comments
+                                </Text>
+                            </View>
+                        </>
+                    }
+                    ListEmptyComponent={
                         <Animated.View 
-                            entering={FadeInUp.duration(300)}
-                            style={styles.commentInputContainer}
+                            entering={FadeIn.duration(400)}
+                            style={{
+                                alignItems: 'center',
+                                padding: 32,
+                                marginHorizontal: 20,
+                            }}
                         >
-                            <TextInput
-                                style={styles.commentInput}
-                                placeholder="Write a comment..."
-                                value={newComment}
-                                onChangeText={setNewComment}
-                                multiline
-                                maxLength={500}
-                            />
-                            <TouchableOpacity
-                                style={[
-                                    styles.sendButton,
-                                    !newComment.trim() && styles.sendButtonDisabled
-                                ]}
-                                onPress={handleAddComment}
-                                disabled={!newComment.trim()}
-                            >
-                                <Ionicons 
-                                    name="send" 
-                                    size={20} 
-                                    color={newComment.trim() ? "#ffffff" : "#B8C1EC"} 
-                                />
-                            </TouchableOpacity>
+                            <View style={{
+                                width: 80,
+                                height: 80,
+                                borderRadius: 40,
+                                backgroundColor: '#f1f5f9',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginBottom: 16,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: 0.05,
+                                shadowRadius: 4,
+                                elevation: 1,
+                            }}>
+                                <Ionicons name="chatbubble-outline" size={32} color="#cbd5e1" />
+                            </View>
+                            <Text style={{ 
+                                color: '#64748b', 
+                                fontSize: 18, 
+                                fontWeight: '600',
+                                marginBottom: 8,
+                                textAlign: 'center',
+                                letterSpacing: -0.2
+                            }}>
+                                No comments yet
+                            </Text>
+                            <Text style={{ 
+                                color: '#94a3b8', 
+                                fontSize: 14,
+                                textAlign: 'center',
+                                lineHeight: 20,
+                                fontWeight: '400'
+                            }}>
+                                Be the first to share your thoughts
+                            </Text>
                         </Animated.View>
-                    ) : (
+                    }
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={['#667eea']}
+                            tintColor="#667eea"
+                        />
+                    }
+                />
+
+                {showCommentInput ? (
+                    <Animated.View 
+                        entering={FadeInUp.duration(300)}
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            padding: 16,
+                            backgroundColor: '#ffffff',
+                            borderTopWidth: 1,
+                            borderTopColor: '#e5e7eb',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: -2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 8,
+                            elevation: 4,
+                        }}
+                    >
+                        <TextInput
+                            style={{
+                                flex: 1,
+                                backgroundColor: '#f8fafc',
+                                borderRadius: 20,
+                                paddingHorizontal: 16,
+                                paddingVertical: 12,
+                                marginRight: 12,
+                                fontSize: 14,
+                                color: '#1f2937',
+                                maxHeight: 100,
+                                borderWidth: 1,
+                                borderColor: '#e2e8f0',
+                            }}
+                            placeholder="Write a comment..."
+                            value={newComment}
+                            onChangeText={setNewComment}
+                            multiline
+                            maxLength={500}
+                        />
                         <TouchableOpacity
-                            style={styles.addCommentButton}
-                            onPress={() => setShowCommentInput(true)}
+                            style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 22,
+                                backgroundColor: newComment.trim() ? '#667eea' : '#e5e7eb',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                shadowColor: newComment.trim() ? '#667eea' : 'transparent',
+                                shadowOffset: { width: 0, height: 2 },
+                                shadowOpacity: newComment.trim() ? 0.2 : 0,
+                                shadowRadius: 4,
+                                elevation: newComment.trim() ? 3 : 0,
+                            }}
+                            onPress={handleAddComment}
+                            disabled={!newComment.trim()}
                         >
-                            <Ionicons name="add-circle" size={24} color="#7F5AF0" />
-                            <Text style={styles.addCommentText}>Add a comment</Text>
+                            <Ionicons 
+                                name="send" 
+                                size={20} 
+                                color={newComment.trim() ? "#ffffff" : "#9ca3af"} 
+                            />
                         </TouchableOpacity>
-                    )}
-                </SafeAreaView>
-            </LinearGradient>
+                    </Animated.View>
+                ) : (
+                    <TouchableOpacity
+                        style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 16,
+                            backgroundColor: '#ffffff',
+                            borderTopWidth: 1,
+                            borderTopColor: '#e5e7eb',
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: -2 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 8,
+                            elevation: 4,
+                        }}
+                        onPress={() => setShowCommentInput(true)}
+                    >
+                        <View style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: '#f8fafc',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            marginRight: 8,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 1 },
+                            shadowOpacity: 0.05,
+                            shadowRadius: 2,
+                            elevation: 1,
+                        }}>
+                            <Ionicons name="add" size={20} color="#667eea" />
+                        </View>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: '#667eea' }}>
+                            Add a comment
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </SafeAreaView>
         </KeyboardAvoidingView>
     );
 }

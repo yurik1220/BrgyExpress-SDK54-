@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
 import "../styles/DocumentRequests.css";
 
 const DocumentRequests = () => {
@@ -20,7 +20,7 @@ const DocumentRequests = () => {
     useEffect(() => {
         const fetchDocumentRequests = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/requests");
+                const response = await api.get("/api/requests");
                 const allRequests = response.data.filter(req => req.type === "Document Request");
                 const pending = allRequests.filter(req => !req.status || req.status === 'pending');
                 const resolved = allRequests.filter(req => req.status && req.status !== 'pending');
@@ -51,10 +51,9 @@ const DocumentRequests = () => {
                 appointment_date: appointmentDateTime
             };
 
-            const response = await axios.patch(
-                `http://localhost:5000/api/document-requests/${selectedRequest.id}`,
-                payload,
-                { headers: { 'Content-Type': 'application/json' } }
+            const response = await api.patch(
+                `/api/document-requests/${selectedRequest.id}`,
+                payload
             );
 
             if (response.data && response.data.id) {
@@ -85,10 +84,9 @@ const DocumentRequests = () => {
                 payload.rejection_reason = rejectionReason;
             }
 
-            const response = await axios.patch(
-                `http://localhost:5000/api/document-requests/${selectedRequest.id}`,
-                payload,
-                { headers: { 'Content-Type': 'application/json' } }
+            const response = await api.patch(
+                `/api/document-requests/${selectedRequest.id}`,
+                payload
             );
 
             if (response.data && response.data.id) {
@@ -140,32 +138,62 @@ const DocumentRequests = () => {
 
     return (
         <div className="document-requests-container">
+            {/* Enhanced Header */}
             <div className="content-header">
                 <div className="header-content">
-                    <i className="fas fa-file-alt header-icon"></i>
-                    <h1>Document Requests</h1>
+                    <div className="header-icon-wrapper">
+                        <i className="fas fa-file-alt header-icon"></i>
+                    </div>
+                    <div className="header-text">
+                        <h1>Document Requests</h1>
+                        <p>Manage and process document requests from residents</p>
+                    </div>
                 </div>
                 <div className="header-stats">
-                    <div className="stat-badge">
-                        <span className="stat-label">Pending</span>
-                        <span className="stat-value">{pendingRequests.length}</span>
+                    <div className="stat-badge pending">
+                        <div className="stat-icon">
+                            <i className="fas fa-clock"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{pendingRequests.length}</span>
+                            <span className="stat-label">Pending</span>
+                        </div>
                     </div>
-                    <div className="stat-badge">
-                        <span className="stat-label">Total</span>
-                        <span className="stat-value">{pendingRequests.length + history.length}</span>
+                    <div className="stat-badge total">
+                        <div className="stat-icon">
+                            <i className="fas fa-file-alt"></i>
+                        </div>
+                        <div className="stat-content">
+                            <span className="stat-value">{pendingRequests.length + history.length}</span>
+                            <span className="stat-label">Total</span>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div style={{ margin: '16px 0', display: 'flex', justifyContent: 'flex-end' }}>
-                <input
-                    type="text"
-                    placeholder="Search by Reference Number..."
-                    value={searchRef}
-                    onChange={e => setSearchRef(e.target.value)}
-                    style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0', width: 260 }}
-                />
+
+            {/* Enhanced Search Bar */}
+            <div className="search-container">
+                <div className="search-wrapper">
+                    <i className="fas fa-search search-icon"></i>
+                    <input
+                        type="text"
+                        placeholder="Search by Reference Number..."
+                        value={searchRef}
+                        onChange={e => setSearchRef(e.target.value)}
+                        className="search-input"
+                    />
+                    {searchRef && (
+                        <button 
+                            className="clear-search"
+                            onClick={() => setSearchRef("")}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    )}
+                </div>
             </div>
 
+            {/* Enhanced Tabs */}
             <div className="tabs-container">
                 <div className="tabs">
                     <button
@@ -173,14 +201,16 @@ const DocumentRequests = () => {
                         onClick={() => setActiveTab("pending")}
                     >
                         <i className="fas fa-clock"></i>
-                        Pending Requests
+                        <span>Pending Requests</span>
+                        <span className="tab-count">{pendingRequests.length}</span>
                     </button>
                     <button
                         className={`tab-button ${activeTab === "history" ? "active" : ""}`}
                         onClick={() => setActiveTab("history")}
                     >
                         <i className="fas fa-history"></i>
-                        History Log
+                        <span>History Log</span>
+                        <span className="tab-count">{history.length}</span>
                     </button>
                 </div>
 
@@ -199,232 +229,228 @@ const DocumentRequests = () => {
                 )}
             </div>
 
+            {/* Enhanced Requests Grid */}
             <div className="requests-grid">
-                {activeTab === "pending" ? (
-                    filteredPending.length > 0 ? (
+                {activeTab === "pending" && (
+                    filteredPending.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-icon">
+                                <i className="fas fa-check-circle"></i>
+                            </div>
+                            <h3>No Pending Requests</h3>
+                            <p>All document requests have been processed!</p>
+                        </div>
+                    ) : (
                         filteredPending.map((request) => (
                             <div
                                 key={request.id}
-                                className="request-card"
+                                className="request-card pending-card"
                                 onClick={() => setSelectedRequest(request)}
                             >
                                 <div className="card-header">
-                                    <span className="document-type">{request.document_type}</span>
-                                    <span className="status-badge pending">Pending</span>
+                                    <div className="request-info">
+                                        <span className="request-type">
+                                            <i className="fas fa-file-alt"></i>
+                                            Document Request
+                                        </span>
+                                        <span className="reference-number">
+                                            #{request.reference_number}
+                                        </span>
+                                    </div>
+                                    <span className="status-badge pending">
+                                        <i className="fas fa-clock"></i>
+                                        Pending
+                                    </span>
                                 </div>
                                 <div className="card-body">
-                                    <div className="info-row">
-                                        <i className="fas fa-user"></i>
-                                        <span>Clerk ID: {request.clerk_id}</span>
+                                    <div className="info-section">
+                                        <div className="info-row">
+                                            <i className="fas fa-user"></i>
+                                            <span className="label">Requester:</span>
+                                            <span className="value">{request.full_name}</span>
+                                        </div>
+                                        <div className="info-row">
+                                            <i className="fas fa-calendar"></i>
+                                            <span className="label">Requested:</span>
+                                            <span className="value">{new Date(request.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="info-row">
+                                            <i className="fas fa-file"></i>
+                                            <span className="label">Document:</span>
+                                            <span className="value">{request.document_type}</span>
+                                        </div>
+                                        <div className="info-row">
+                                            <i className="fas fa-phone"></i>
+                                            <span className="label">Contact:</span>
+                                            <span className="value">{request.contact}</span>
+                                        </div>
                                     </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-comment"></i>
-                                        <span>{request.reason}</span>
-                                    </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-clock"></i>
-                                        <span>{new Date(request.created_at).toLocaleString()}</span>
+                                    <div className="card-actions">
+                                        <button 
+                                            className="action-btn approve"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedRequest(request);
+                                                setShowAppointmentModal(true);
+                                            }}
+                                        >
+                                            <i className="fas fa-check"></i>
+                                            Approve
+                                        </button>
+                                        <button 
+                                            className="action-btn reject"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedRequest(request);
+                                                setShowRejectForm(true);
+                                            }}
+                                        >
+                                            <i className="fas fa-times"></i>
+                                            Reject
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         ))
-                    ) : (
-                        <div className="empty-state">
-                            <i className="fas fa-inbox"></i>
-                            <p>No pending document requests</p>
-                        </div>
                     )
-                ) : (
-                    filteredHistory.length > 0 ? (
+                )}
+
+                {activeTab === "history" && (
+                    filteredHistory.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-icon">
+                                <i className="fas fa-history"></i>
+                            </div>
+                            <h3>No History</h3>
+                            <p>No processed requests found.</p>
+                        </div>
+                    ) : (
                         filteredHistory.map((request) => (
                             <div
                                 key={request.id}
-                                className={`request-card ${request.status.toLowerCase()}`}
+                                className={`request-card history-card ${request.status}`}
                                 onClick={() => setSelectedRequest(request)}
                             >
                                 <div className="card-header">
-                                    <span className="document-type">{request.document_type}</span>
-                                    <span className={`status-badge ${request.status.toLowerCase()}`}>
+                                    <div className="request-info">
+                                        <span className="request-type">
+                                            <i className="fas fa-file-alt"></i>
+                                            Document Request
+                                        </span>
+                                        <span className="reference-number">
+                                            #{request.reference_number}
+                                        </span>
+                                    </div>
+                                    <span className={`status-badge ${request.status}`}>
+                                        <i className={`fas fa-${request.status === 'approved' ? 'check' : 'times'}`}></i>
                                         {request.status}
                                     </span>
                                 </div>
                                 <div className="card-body">
-                                    <div className="info-row">
-                                        <i className="fas fa-user"></i>
-                                        <span>Clerk ID: {request.clerk_id}</span>
-                                    </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-comment"></i>
-                                        <span>{request.reason}</span>
-                                    </div>
-                                    {request.status.toLowerCase() === 'approved' && request.appointment_date && (
+                                    <div className="info-section">
                                         <div className="info-row">
-                                            <i className="fas fa-calendar-check"></i>
-                                            <span>Pickup: {new Date(request.appointment_date).toLocaleString()}</span>
+                                            <i className="fas fa-user"></i>
+                                            <span className="label">Requester:</span>
+                                            <span className="value">{request.full_name}</span>
                                         </div>
-                                    )}
-                                    {request.status.toLowerCase() === 'rejected' && request.rejection_reason && (
                                         <div className="info-row">
-                                            <i className="fas fa-times-circle"></i>
-                                            <span>Reason: {request.rejection_reason}</span>
+                                            <i className="fas fa-calendar"></i>
+                                            <span className="label">Processed:</span>
+                                            <span className="value">{new Date(request.resolved_at).toLocaleDateString()}</span>
                                         </div>
-                                    )}
-                                    <div className="timeline">
-                                        <div className="timeline-item">
-                                            <i className="fas fa-paper-plane"></i>
-                                            <span>Submitted: {new Date(request.created_at).toLocaleString()}</span>
+                                        <div className="info-row">
+                                            <i className="fas fa-file"></i>
+                                            <span className="label">Document:</span>
+                                            <span className="value">{request.document_type}</span>
                                         </div>
-                                        <div className="timeline-item">
-                                            <i className="fas fa-check-circle"></i>
-                                            <span>Resolved: {new Date(request.resolved_at).toLocaleString()}</span>
-                                        </div>
+                                        {request.appointment_date && (
+                                            <div className="info-row">
+                                                <i className="fas fa-calendar-check"></i>
+                                                <span className="label">Appointment:</span>
+                                                <span className="value">{new Date(request.appointment_date).toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        {request.rejection_reason && (
+                                            <div className="info-row">
+                                                <i className="fas fa-comment"></i>
+                                                <span className="label">Reason:</span>
+                                                <span className="value">{request.rejection_reason}</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         ))
-                    ) : (
-                        <div className="empty-state">
-                            <i className="fas fa-history"></i>
-                            <p>No {historyFilter === "all" ? "" : historyFilter} requests in history</p>
-                        </div>
                     )
                 )}
             </div>
 
-            {selectedRequest && !showRejectForm && !showAppointmentModal && (
+            {/* Enhanced Modals */}
+            {showRejectForm && selectedRequest && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <div className="modal-header">
-                            <h2>Request Details</h2>
-                            <button className="close-button" onClick={() => setSelectedRequest(null)}>
+                            <h3>Reject Request</h3>
+                            <button className="close-btn" onClick={() => setShowRejectForm(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <div className="modal-body">
-                            {selectedRequest.reference_number && (
-                                <div className="detail-item">
-                                    <i className="fas fa-hashtag"></i>
-                                    <div>
-                                        <label>Reference Number</label>
-                                        <p>{selectedRequest.reference_number}</p>
-                                    </div>
-                                </div>
-                            )}
-                            <div className="detail-item">
-                                <i className="fas fa-file-alt"></i>
-                                <div>
-                                    <label>Document Type</label>
-                                    <p>{selectedRequest.document_type}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-user"></i>
-                                <div>
-                                    <label>Clerk ID</label>
-                                    <p>{selectedRequest.clerk_id}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-comment"></i>
-                                <div>
-                                    <label>Reason</label>
-                                    <p>{selectedRequest.reason}</p>
-                                </div>
-                            </div>
-                            <div className="detail-item">
-                                <i className="fas fa-clock"></i>
-                                <div>
-                                    <label>Date Submitted</label>
-                                    <p>{new Date(selectedRequest.created_at).toLocaleString()}</p>
-                                </div>
-                            </div>
-                        </div>
-                        {(!selectedRequest.status || selectedRequest.status === 'pending') && (
-                            <div className="modal-footer">
-                                <button className="approve-button" onClick={() => setShowAppointmentModal(true)}>
-                                    <i className="fas fa-check"></i>
-                                    Approve
-                                </button>
-                                <button className="reject-button" onClick={() => setShowRejectForm(true)}>
-                                    <i className="fas fa-times"></i>
-                                    Reject
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {showRejectForm && (
-                <div className="modal-overlay">
-                    <div className="modal">
-                        <div className="modal-header">
-                            <h2>Reason for Rejection</h2>
-                            <button className="close-button" onClick={() => { setShowRejectForm(false); setRejectionReason(""); }}>
-                                <i className="fas fa-times"></i>
-                            </button>
-                        </div>
-                        <div className="modal-body">
+                            <p>Please provide a reason for rejecting this request:</p>
                             <textarea
-                                className="rejection-textarea"
-                                placeholder="Enter rejection reason..."
                                 value={rejectionReason}
                                 onChange={(e) => setRejectionReason(e.target.value)}
-                                rows="5"
+                                placeholder="Enter rejection reason..."
+                                className="rejection-textarea"
                             />
                         </div>
-                        <div className="modal-footer">
-                            <button className="confirm-reject-button" onClick={confirmRejection}>
-                                <i className="fas fa-check"></i>
-                                Confirm Rejection
-                            </button>
-                            <button className="cancel-button" onClick={() => { setShowRejectForm(false); setRejectionReason(""); }}>
-                                <i className="fas fa-times"></i>
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowRejectForm(false)}>
                                 Cancel
+                            </button>
+                            <button className="btn-danger" onClick={confirmRejection}>
+                                Reject Request
                             </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {showAppointmentModal && (
+            {showAppointmentModal && selectedRequest && (
                 <div className="modal-overlay">
                     <div className="modal">
                         <div className="modal-header">
-                            <h2>Schedule Pickup</h2>
-                            <button className="close-button" onClick={() => { setShowAppointmentModal(false); setAppointmentDate(""); setAppointmentTime(""); }}>
+                            <h3>Schedule Appointment</h3>
+                            <button className="close-btn" onClick={() => setShowAppointmentModal(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
                         <div className="modal-body">
-                            <div className="appointment-form">
-                                <div className="form-group">
-                                    <label>Date</label>
-                                    <input
-                                        type="date"
-                                        value={appointmentDate}
-                                        onChange={(e) => setAppointmentDate(e.target.value)}
-                                        min={new Date().toISOString().split('T')[0]}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Time</label>
-                                    <input
-                                        type="time"
-                                        value={appointmentTime}
-                                        onChange={(e) => setAppointmentTime(e.target.value)}
-                                    />
-                                </div>
+                            <div className="form-group">
+                                <label>Appointment Date:</label>
+                                <input
+                                    type="date"
+                                    value={appointmentDate}
+                                    onChange={(e) => setAppointmentDate(e.target.value)}
+                                    className="form-input"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Appointment Time:</label>
+                                <input
+                                    type="time"
+                                    value={appointmentTime}
+                                    onChange={(e) => setAppointmentTime(e.target.value)}
+                                    className="form-input"
+                                />
                             </div>
                         </div>
-                        <div className="modal-footer">
-                            <button className="confirm-button" onClick={handleApproveWithAppointment}>
-                                <i className="fas fa-check"></i>
-                                Schedule & Approve
-                            </button>
-                            <button className="cancel-button" onClick={() => { setShowAppointmentModal(false); setAppointmentDate(""); setAppointmentTime(""); }}>
-                                <i className="fas fa-times"></i>
+                        <div className="modal-actions">
+                            <button className="btn-secondary" onClick={() => setShowAppointmentModal(false)}>
                                 Cancel
+                            </button>
+                            <button className="btn-success" onClick={handleApproveWithAppointment}>
+                                Approve & Schedule
                             </button>
                         </div>
                     </div>
