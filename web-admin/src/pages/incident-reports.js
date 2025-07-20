@@ -153,55 +153,56 @@ const IncidentReports = () => {
                 </div>
             </div>
 
-            {/* Enhanced Search Bar */}
-            <div className="search-container">
-                <div className="search-wrapper">
-                    <i className="fas fa-search search-icon"></i>
-                    <input
-                        type="text"
-                        placeholder="Search by Reference Number..."
-                        value={searchRef}
-                        onChange={e => setSearchRef(e.target.value)}
-                        className="search-input"
-                    />
-                    {searchRef && (
-                        <button 
-                            className="clear-search"
-                            onClick={() => setSearchRef("")}
-                        >
-                            <i className="fas fa-times"></i>
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {/* Enhanced Tabs */}
             <div className="tabs-container">
-                <div className="tabs">
-                    <button
-                        className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-                        onClick={() => setActiveTab("pending")}
-                    >
-                        <i className="fas fa-clock"></i>
-                        <span>Pending Reports</span>
-                        <span className="tab-count">{pendingIncidents.length}</span>
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === "active" ? "active" : ""}`}
-                        onClick={() => setActiveTab("active")}
-                    >
-                        <i className="fas fa-search"></i>
-                        <span>Active Reports</span>
-                        <span className="tab-count">{activeIncidents.length}</span>
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === "closed" ? "active" : ""}`}
-                        onClick={() => setActiveTab("closed")}
-                    >
-                        <i className="fas fa-check-circle"></i>
-                        <span>Closed Reports</span>
-                        <span className="tab-count">{closedIncidents.length}</span>
-                    </button>
+                <div className="tabs-header">
+                    <div className="tabs">
+                        <button
+                            className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
+                            onClick={() => setActiveTab("pending")}
+                        >
+                            <i className="fas fa-clock"></i>
+                            <span>Pending Reports</span>
+                            <span className="tab-count">{pendingIncidents.length}</span>
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === "active" ? "active" : ""}`}
+                            onClick={() => setActiveTab("active")}
+                        >
+                            <i className="fas fa-search"></i>
+                            <span>Active Reports</span>
+                            <span className="tab-count">{activeIncidents.length}</span>
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === "closed" ? "active" : ""}`}
+                            onClick={() => setActiveTab("closed")}
+                        >
+                            <i className="fas fa-check-circle"></i>
+                            <span>Closed Reports</span>
+                            <span className="tab-count">{closedIncidents.length}</span>
+                        </button>
+                    </div>
+
+                    <div className="search-container">
+                        <div className="search-wrapper">
+                            <i className="fas fa-search search-icon"></i>
+                            <input
+                                type="text"
+                                placeholder="Search by Reference Number..."
+                                value={searchRef}
+                                onChange={e => setSearchRef(e.target.value)}
+                                className="search-input"
+                            />
+                            {searchRef && (
+                                <button 
+                                    className="clear-search"
+                                    onClick={() => setSearchRef("")}
+                                >
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 

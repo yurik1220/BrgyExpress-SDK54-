@@ -9,6 +9,8 @@ import IncidentReports from './pages/incident-reports';
 import CreateIDRequests from './pages/id-requests';
 import AnnouncementPage from './pages/announcement-page';
 import AuditLogs from './pages/audit-logs';
+import Analytics from './pages/analytics';
+
 import './styles/Dashboard.css';
 
 function App() {
@@ -31,6 +33,8 @@ function App() {
                     <Route path="id-requests" element={<CreateIDRequests />} />
                     <Route path="announcement-page" element={<AnnouncementPage />} />
                     <Route path="audit-logs" element={<AuditLogs />} />
+                    <Route path="analytics" element={<Analytics />} />
+
                 </Route>
                 
                 {/* Catch all */}

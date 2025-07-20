@@ -76,13 +76,48 @@ body {
 .dashboard-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 20px;
     padding: 20px;
     background: white;
     border-radius: 16px;
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.time-display {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    justify-content: center;
+    min-height: 60px;
+}
+
+.time-main {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1e293b;
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+    line-height: 1;
+}
+
+.date-info {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.date-info::before {
+    content: '🕐';
+    font-size: 12px;
 }
 
 .header-content h1 {
@@ -390,7 +425,7 @@ body {
 
 .empty-urgent i {
     font-size: 32px;
-    color: #10b981;
+    color: #3b82f6;
     margin-bottom: 12px;
 }
 
@@ -634,7 +669,8 @@ body {
 .empty-activity i {
     font-size: 48px;
     margin-bottom: 16px;
-    opacity: 0.5;
+    color: #3b82f6;
+    opacity: 0.7;
 }
 
 .empty-activity p {
@@ -665,7 +701,7 @@ body {
 
 .empty-icon i {
     font-size: 32px;
-    color: #64748b;
+    color: #3b82f6;
 }
 
 .empty-state h2 {
@@ -760,6 +796,14 @@ body {
         justify-content: center;
     }
     
+    .time-main {
+        font-size: 28px;
+    }
+    
+    .date-info {
+        font-size: 13px;
+    }
+    
     .header-content h1 {
         font-size: 24px;
     }
@@ -779,6 +823,14 @@ body {
     
     .dashboard-header {
         padding: 12px;
+    }
+    
+    .time-main {
+        font-size: 24px;
+    }
+    
+    .date-info {
+        font-size: 12px;
     }
     
     .header-content h1 {
@@ -850,4 +902,93 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+}
+
+/* ===== MODAL STYLES ===== */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    margin-bottom: 16px;
+}
+
+.modal-header h3 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.modal-body {
+    margin-bottom: 24px;
+}
+
+.modal-body p {
+    color: #64748b;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.modal-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.modal-button.cancel {
+    background-color: #f1f5f9;
+    color: #64748b;
+}
+
+.modal-button.cancel:hover {
+    background-color: #e2e8f0;
+}
+
+.modal-button.confirm {
+    background-color: #ef4444;
+    color: white;
+}
+
+.modal-button.confirm:hover {
+    background-color: #dc2626;
 }
