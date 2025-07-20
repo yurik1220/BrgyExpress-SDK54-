@@ -167,6 +167,8 @@ const CreateIDScreen = () => {
     }
   };
 
+
+
   // Prepare data for confirmation modal
   const confirmationData = {
     full_name: fullName,
@@ -368,6 +370,8 @@ const CreateIDScreen = () => {
           </View>
         </View>
       </Animated.View>
+
+
     </ScrollView>
   );
 

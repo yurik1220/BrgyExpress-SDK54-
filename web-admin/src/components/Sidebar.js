@@ -11,7 +11,7 @@ const Sidebar = ({ onSignOut }) => {
             <ul>
                 <li>
                     <NavLink to="/dashboard" className={({ isActive }) => isActive ? 'active' : ''}>
-                        <i className="fas fa-chart-line"></i>
+                        <i className="fas fa-home"></i>
                         Dashboard
                     </NavLink>
                 </li>
@@ -45,6 +45,13 @@ const Sidebar = ({ onSignOut }) => {
                         Audit Logs
                     </NavLink>
                 </li>
+                <li>
+                    <NavLink to="/analytics" className={({ isActive }) => isActive ? 'active' : ''}>
+                        <i className="fas fa-chart-line"></i>
+                        Analytics
+                    </NavLink>
+                </li>
+
             </ul>
             
             {/* Admin Profile Section */}

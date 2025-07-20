@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import ConfirmationModal from './ConfirmationModal';
@@ -10,6 +10,38 @@ import '../styles/Sidebar.css';
 const DashboardLayout = () => {
     const location = useLocation();
     const [showSignOutModal, setShowSignOutModal] = useState(false);
+
+    // Handle automatic logout on window/tab close
+    useEffect(() => {
+        const handleBeforeUnload = (event) => {
+            // Logout immediately when window/tab is being closed
+            // sessionManager.logout(); // Temporarily disabled for debugging
+        };
+
+        const handleVisibilityChange = () => {
+            // Logout when page becomes hidden (tab switch, minimize, etc.)
+            if (document.hidden) {
+                // sessionManager.logout(); // Temporarily disabled for debugging
+            }
+        };
+
+        const handlePageHide = (event) => {
+            // Logout when page is being unloaded
+            // sessionManager.logout(); // Temporarily disabled for debugging
+        };
+
+        // Add event listeners for different scenarios
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handlePageHide);
+
+        // Cleanup event listeners on component unmount
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
+    }, []);
 
     const handleSignOutClick = () => {
         setShowSignOutModal(true);

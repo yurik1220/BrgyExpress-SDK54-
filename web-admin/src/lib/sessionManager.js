@@ -5,6 +5,7 @@ class SessionManager {
         this.sessionTimer = null;
         this.sessionStartTime = null;
         this.isActive = false;
+        this.isLoggingOut = false; // Prevent multiple logout calls
         this.init();
     }
 
@@ -17,13 +18,20 @@ class SessionManager {
 
         // Check if user is already logged in
         const adminData = localStorage.getItem('adminData');
-        if (adminData) {
+        const adminToken = localStorage.getItem('adminToken');
+        
+        if (adminData && adminToken) {
             this.startSession();
+        } else {
+            // Clear any invalid data
+            localStorage.removeItem('adminData');
+            localStorage.removeItem('adminToken');
         }
     }
 
     startSession() {
         this.isActive = true;
+        this.isLoggingOut = false; // Reset logout flag
         this.sessionStartTime = Date.now();
         this.resetTimer();
     }
@@ -46,6 +54,12 @@ class SessionManager {
     }
 
     logout() {
+        // Prevent multiple logout calls
+        if (this.isLoggingOut) {
+            return;
+        }
+
+        this.isLoggingOut = true;
         this.isActive = false;
         this.sessionStartTime = null;
         if (this.sessionTimer) {
@@ -69,11 +83,15 @@ class SessionManager {
         localStorage.removeItem('adminData');
         localStorage.removeItem('adminToken');
 
-        // Show notification
-        this.showSessionExpiredNotification();
+        // Show notification only if not triggered by window/tab close
+        if (!document.hidden) {
+            this.showSessionExpiredNotification();
+        }
 
-        // Redirect to login
-        window.location.href = '/login';
+        // Redirect to login only if not triggered by window/tab close
+        if (!document.hidden) {
+            window.location.href = '/login';
+        }
     }
 
     showSessionExpiredNotification() {
@@ -126,6 +144,35 @@ class SessionManager {
         if (this.isActive) {
             this.resetTimer();
         }
+    }
+
+    // Validate session with backend
+    async validateSession() {
+        try {
+            const response = await fetch('http://localhost:5000/api/admin/session', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Session validation failed');
+            }
+
+            return true;
+        } catch (error) {
+            console.error('Session validation error:', error);
+            this.logout();
+            return false;
+        }
+    }
+
+    // Check if session is valid
+    isSessionValid() {
+        const adminData = localStorage.getItem('adminData');
+        const adminToken = localStorage.getItem('adminToken');
+        return !!(adminData && adminToken && this.isActive);
     }
 }
 

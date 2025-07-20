@@ -241,6 +241,27 @@ console.log('🔧 Middleware configured: CORS, JSON parsing, static files, rate 
 // ========== ADMIN AUTHENTICATION ENDPOINTS ========== //
 console.log('🔐 Setting up admin authentication endpoints...');
 
+// Admin Session Check Endpoint
+app.get('/api/admin/session', generalLimiter, async (req, res) => {
+    console.log('🔍 Checking admin session...');
+    
+    try {
+        // In a real implementation, you would validate the token here
+        // For now, we'll just return success if the endpoint is accessible
+        res.status(200).json({
+            success: true,
+            message: 'Session valid',
+            timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+        console.error('❌ Session check error:', error);
+        res.status(401).json({ 
+            success: false, 
+            message: 'Session invalid' 
+        });
+    }
+});
+
 // Admin Logout Endpoint
 app.post('/api/admin/logout', auditLog('Admin Logout'), async (req, res) => {
     console.log('🚪 Admin logout request');
@@ -557,6 +578,315 @@ app.post('/api/admin/create', auditLog('Admin Creation'), [
         res.status(500).json({ 
             success: false, 
             message: 'Internal server error' 
+        });
+    }
+});
+
+// ========== ANALYTICS ENDPOINTS ========== //
+console.log('📊 Setting up analytics endpoints...');
+
+// Get analytics data
+app.get('/api/analytics/overview', generalLimiter, auditLog('Analytics Overview'), async (req, res) => {
+    try {
+        // Get date range from query params (default to last 30 days)
+        const days = parseInt(req.query.days) || 30;
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+
+        // Get all requests from the three separate tables
+        const [documentRequests, idRequests, incidentReports] = await Promise.all([
+            pool.query("SELECT *, 'Document Request' as type FROM document_requests WHERE created_at >= $1", [startDate]),
+            pool.query("SELECT *, 'Create ID' as type FROM id_requests WHERE created_at >= $1", [startDate]),
+            pool.query("SELECT *, 'Incident Report' as type FROM incident_reports WHERE created_at >= $1", [startDate])
+        ]);
+
+        // Combine all requests
+        const requests = [
+            ...documentRequests.rows,
+            ...idRequests.rows,
+            ...incidentReports.rows
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        // Calculate analytics
+        const analytics = {
+            totalRequests: requests.length,
+            requestTypes: {
+                'Document Request': documentRequests.rows.length,
+                'Create ID': idRequests.rows.length,
+                'Incident Report': incidentReports.rows.length
+            },
+            statusDistribution: {
+                pending: requests.filter(r => r.status === 'pending').length,
+                approved: requests.filter(r => r.status === 'approved').length,
+                rejected: requests.filter(r => r.status === 'rejected').length
+            },
+            dailyTrends: {},
+            monthlyTrends: {},
+            averageProcessingTime: 0,
+            peakHours: {},
+            recentActivity: requests.slice(0, 10)
+        };
+
+        // Calculate daily trends
+        const dailyData = {};
+        requests.forEach(request => {
+            const date = new Date(request.created_at).toDateString();
+            dailyData[date] = (dailyData[date] || 0) + 1;
+        });
+        analytics.dailyTrends = dailyData;
+
+        // Calculate peak hours
+        const hourlyData = {};
+        requests.forEach(request => {
+            const hour = new Date(request.created_at).getHours();
+            hourlyData[hour] = (hourlyData[hour] || 0) + 1;
+        });
+        analytics.peakHours = hourlyData;
+
+        // Calculate average processing time (for completed requests)
+        const completedRequests = requests.filter(r => r.status === 'approved' || r.status === 'rejected');
+        if (completedRequests.length > 0) {
+            const totalProcessingTime = completedRequests.reduce((total, request) => {
+                const created = new Date(request.created_at);
+                const updated = new Date(request.updated_at || request.created_at);
+                return total + (updated - created);
+            }, 0);
+            analytics.averageProcessingTime = Math.round(totalProcessingTime / completedRequests.length / (1000 * 60 * 60)); // in hours
+        }
+
+        res.json({
+            success: true,
+            analytics,
+            dateRange: {
+                start: startDate,
+                end: new Date(),
+                days
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Analytics error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch analytics data' 
+        });
+    }
+});
+
+// Get detailed analytics with filters
+app.get('/api/analytics/detailed', generalLimiter, auditLog('Detailed Analytics'), async (req, res) => {
+    try {
+        const { startDate, endDate, type, status } = req.query;
+        
+        // Build queries for each table based on type filter
+        let documentQuery = "SELECT *, 'Document Request' as type FROM document_requests WHERE 1=1";
+        let idQuery = "SELECT *, 'Create ID' as type FROM id_requests WHERE 1=1";
+        let incidentQuery = "SELECT *, 'Incident Report' as type FROM incident_reports WHERE 1=1";
+        
+        const params = [];
+        let paramIndex = 1;
+
+        // Add date filters
+        if (startDate) {
+            documentQuery += ` AND created_at >= $${paramIndex}`;
+            idQuery += ` AND created_at >= $${paramIndex}`;
+            incidentQuery += ` AND created_at >= $${paramIndex}`;
+            params.push(startDate);
+            paramIndex++;
+        }
+
+        if (endDate) {
+            documentQuery += ` AND created_at <= $${paramIndex}`;
+            idQuery += ` AND created_at <= $${paramIndex}`;
+            incidentQuery += ` AND created_at <= $${paramIndex}`;
+            params.push(endDate);
+            paramIndex++;
+        }
+
+        // Add status filter
+        if (status) {
+            documentQuery += ` AND status = $${paramIndex}`;
+            idQuery += ` AND status = $${paramIndex}`;
+            incidentQuery += ` AND status = $${paramIndex}`;
+            params.push(status);
+            paramIndex++;
+        }
+
+        // Execute queries based on type filter
+        let requests = [];
+        
+        if (!type || type === 'Document Request') {
+            const docResult = await pool.query(documentQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...docResult.rows);
+        }
+        
+        if (!type || type === 'Create ID') {
+            const idResult = await pool.query(idQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...idResult.rows);
+        }
+        
+        if (!type || type === 'Incident Report') {
+            const incidentResult = await pool.query(incidentQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...incidentResult.rows);
+        }
+
+        // Sort all requests by created_at
+        requests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        // Calculate detailed analytics
+        const analytics = {
+            totalRequests: requests.length,
+            requestTypes: {},
+            statusDistribution: {},
+            dailyTrends: {},
+            processingTimes: [],
+            userActivity: {}
+        };
+
+        // Calculate distributions
+        requests.forEach(request => {
+            // Request types
+            analytics.requestTypes[request.type] = (analytics.requestTypes[request.type] || 0) + 1;
+            
+            // Status distribution
+            analytics.statusDistribution[request.status] = (analytics.statusDistribution[request.status] || 0) + 1;
+            
+            // Daily trends
+            const date = new Date(request.created_at).toDateString();
+            analytics.dailyTrends[date] = (analytics.dailyTrends[date] || 0) + 1;
+            
+            // Processing times
+            if (request.status === 'approved' || request.status === 'rejected') {
+                const created = new Date(request.created_at);
+                const updated = new Date(request.updated_at || request.created_at);
+                const processingTime = (updated - created) / (1000 * 60 * 60); // in hours
+                analytics.processingTimes.push(processingTime);
+            }
+            
+            // User activity (using clerk_id as user identifier)
+            if (request.clerk_id) {
+                analytics.userActivity[request.clerk_id] = (analytics.userActivity[request.clerk_id] || 0) + 1;
+            }
+        });
+
+        res.json({
+            success: true,
+            analytics,
+            filters: { startDate, endDate, type, status }
+        });
+
+    } catch (error) {
+        console.error('❌ Detailed analytics error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to fetch detailed analytics' 
+        });
+    }
+});
+
+// Export analytics data
+app.get('/api/analytics/export', generalLimiter, auditLog('Analytics Export'), async (req, res) => {
+    try {
+        const { format, startDate, endDate, type, status } = req.query;
+        
+        // Build queries for each table based on type filter
+        let documentQuery = "SELECT *, 'Document Request' as type FROM document_requests WHERE 1=1";
+        let idQuery = "SELECT *, 'Create ID' as type FROM id_requests WHERE 1=1";
+        let incidentQuery = "SELECT *, 'Incident Report' as type FROM incident_reports WHERE 1=1";
+        
+        const params = [];
+        let paramIndex = 1;
+
+        // Add date filters
+        if (startDate) {
+            documentQuery += ` AND created_at >= $${paramIndex}`;
+            idQuery += ` AND created_at >= $${paramIndex}`;
+            incidentQuery += ` AND created_at >= $${paramIndex}`;
+            params.push(startDate);
+            paramIndex++;
+        }
+
+        if (endDate) {
+            documentQuery += ` AND created_at <= $${paramIndex}`;
+            idQuery += ` AND created_at <= $${paramIndex}`;
+            incidentQuery += ` AND created_at <= $${paramIndex}`;
+            params.push(endDate);
+            paramIndex++;
+        }
+
+        // Add status filter
+        if (status) {
+            documentQuery += ` AND status = $${paramIndex}`;
+            idQuery += ` AND status = $${paramIndex}`;
+            incidentQuery += ` AND status = $${paramIndex}`;
+            params.push(status);
+            paramIndex++;
+        }
+
+        // Execute queries based on type filter
+        let requests = [];
+        
+        if (!type || type === 'Document Request') {
+            const docResult = await pool.query(documentQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...docResult.rows);
+        }
+        
+        if (!type || type === 'Create ID') {
+            const idResult = await pool.query(idQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...idResult.rows);
+        }
+        
+        if (!type || type === 'Incident Report') {
+            const incidentResult = await pool.query(incidentQuery + ' ORDER BY created_at DESC', params);
+            requests.push(...incidentResult.rows);
+        }
+
+        // Sort all requests by created_at
+        requests.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        if (format === 'csv') {
+            // Generate CSV
+            const csvHeaders = ['ID', 'Type', 'Status', 'Clerk ID', 'Created At', 'Updated At', 'Details'];
+            const csvData = requests.map(req => [
+                req.id,
+                req.type,
+                req.status,
+                req.clerk_id || '',
+                new Date(req.created_at).toLocaleString(),
+                req.updated_at ? new Date(req.updated_at).toLocaleString() : '',
+                req.document_type || req.reason || req.description || req.title || ''
+            ]);
+
+            const csvContent = [csvHeaders, ...csvData]
+                .map(row => row.map(cell => `"${cell}"`).join(','))
+                .join('\n');
+
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename="analytics-${new Date().toISOString().split('T')[0]}.csv"`);
+            res.send(csvContent);
+
+        } else if (format === 'json') {
+            // Generate JSON
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename="analytics-${new Date().toISOString().split('T')[0]}.json"`);
+            res.json({
+                exportDate: new Date().toISOString(),
+                filters: { startDate, endDate, type, status },
+                data: requests
+            });
+
+        } else {
+            res.status(400).json({ 
+                success: false, 
+                message: 'Unsupported export format. Use "csv" or "json".' 
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Export error:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to export analytics data' 
         });
     }
 });

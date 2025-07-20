@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import '../styles/Dashboard.css';
 
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -140,8 +141,10 @@ const Dashboard = () => {
             {/* Header Section */}
             <div className="dashboard-header">
                 <div className="header-content">
-                    <h1>{timeString}</h1>
-                    <p>{dateString} • Manila Time</p>
+                    <div className="time-display">
+                        <div className="time-main">{timeString}</div>
+                        <div className="date-info">{dateString} • Manila Time</div>
+                    </div>
                 </div>
                 <div className="header-stats">
                     <div className="quick-stat">
@@ -159,6 +162,7 @@ const Dashboard = () => {
                             return new Date(r.created_at).toDateString() === today;
                         }).length}</span>
                     </div>
+
                 </div>
             </div>
 

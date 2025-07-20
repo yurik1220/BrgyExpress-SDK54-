@@ -127,47 +127,48 @@ const IdRequests = () => {
                 </div>
             </div>
 
-            {/* Enhanced Search Bar */}
-            <div className="search-container">
-                <div className="search-wrapper">
-                    <i className="fas fa-search search-icon"></i>
-                    <input
-                        type="text"
-                        placeholder="Search by Reference Number..."
-                        value={searchRef}
-                        onChange={e => setSearchRef(e.target.value)}
-                        className="search-input"
-                    />
-                    {searchRef && (
-                        <button 
-                            className="clear-search"
-                            onClick={() => setSearchRef("")}
-                        >
-                            <i className="fas fa-times"></i>
-                        </button>
-                    )}
-                </div>
-            </div>
-
             {/* Enhanced Tabs */}
             <div className="tabs-container">
-                <div className="tabs">
-                    <button
-                        className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
-                        onClick={() => setActiveTab("pending")}
-                    >
-                        <i className="fas fa-clock"></i>
-                        <span>Pending Requests</span>
-                        <span className="tab-count">{requests.filter(req => req.status === "pending").length}</span>
-                    </button>
-                    <button
-                        className={`tab-button ${activeTab === "history" ? "active" : ""}`}
-                        onClick={() => setActiveTab("history")}
-                    >
-                        <i className="fas fa-history"></i>
-                        <span>History</span>
-                        <span className="tab-count">{requests.filter(req => req.status !== "pending").length}</span>
-                    </button>
+                <div className="tabs-header">
+                    <div className="tabs">
+                        <button
+                            className={`tab-button ${activeTab === "pending" ? "active" : ""}`}
+                            onClick={() => setActiveTab("pending")}
+                        >
+                            <i className="fas fa-clock"></i>
+                            <span>Pending Requests</span>
+                            <span className="tab-count">{requests.filter(req => req.status === "pending").length}</span>
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === "history" ? "active" : ""}`}
+                            onClick={() => setActiveTab("history")}
+                        >
+                            <i className="fas fa-history"></i>
+                            <span>History</span>
+                            <span className="tab-count">{requests.filter(req => req.status !== "pending").length}</span>
+                        </button>
+                    </div>
+
+                    <div className="search-container">
+                        <div className="search-wrapper">
+                            <i className="fas fa-search search-icon"></i>
+                            <input
+                                type="text"
+                                placeholder="Search by Reference Number..."
+                                value={searchRef}
+                                onChange={e => setSearchRef(e.target.value)}
+                                className="search-input"
+                            />
+                            {searchRef && (
+                                <button 
+                                    className="clear-search"
+                                    onClick={() => setSearchRef("")}
+                                >
+                                    <i className="fas fa-times"></i>
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
                 {activeTab === "history" && (
                     <div className="filter-container">
