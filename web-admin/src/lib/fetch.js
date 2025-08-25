@@ -48,10 +48,14 @@ api.interceptors.response.use(
     },
     (error) => {
         if (error.response?.status === 401) {
-            // Unauthorized - redirect to login
+            try {
+                // Attempt to call backend logout for audit logging, but don't block
+                fetch('http://localhost:5000/api/admin/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } }).catch(() => {});
+            } catch {}
+            // Hard client-side logout regardless of API state
             localStorage.removeItem('adminData');
             localStorage.removeItem('adminToken');
-            window.location.href = '/login';
+            window.location.replace('/login');
         }
         return Promise.reject(error);
     }

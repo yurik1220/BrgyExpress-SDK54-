@@ -10,6 +10,7 @@ import CreateIDRequests from './pages/id-requests';
 import AnnouncementPage from './pages/announcement-page';
 import AuditLogs from './pages/audit-logs';
 import Analytics from './pages/analytics';
+import AccountMaintenance from './pages/account-maintenance';
 
 import './styles/Dashboard.css';
 
@@ -34,6 +35,7 @@ function App() {
                     <Route path="announcement-page" element={<AnnouncementPage />} />
                     <Route path="audit-logs" element={<AuditLogs />} />
                     <Route path="analytics" element={<Analytics />} />
+                    <Route path="account-maintenance" element={<AccountMaintenance />} />
 
                 </Route>
                 

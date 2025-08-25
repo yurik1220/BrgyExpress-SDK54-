@@ -53,9 +53,9 @@ class SessionManager {
         }, this.SESSION_TIMEOUT);
     }
 
-    logout() {
-        // Prevent multiple logout calls
-        if (this.isLoggingOut) {
+    logout(force = false) {
+        // Prevent multiple concurrent logout calls unless forced by user action
+        if (this.isLoggingOut && !force) {
             return;
         }
 
@@ -83,14 +83,14 @@ class SessionManager {
         localStorage.removeItem('adminData');
         localStorage.removeItem('adminToken');
 
-        // Show notification only if not triggered by window/tab close
-        if (!document.hidden) {
+        // Show notification for interactive contexts, or when forced by user
+        if (force || !document.hidden) {
             this.showSessionExpiredNotification();
         }
 
-        // Redirect to login only if not triggered by window/tab close
-        if (!document.hidden) {
-            window.location.href = '/login';
+        // Redirect to login for interactive contexts or forced actions
+        if (force || !document.hidden) {
+            window.location.replace('/login');
         }
     }
 

@@ -48,8 +48,8 @@ const DashboardLayout = () => {
     };
 
     const handleSignOutConfirm = () => {
-        // Use session manager to logout
-        sessionManager.logout();
+        // Use session manager to logout (force ensures redirect even if session already expired)
+        sessionManager.logout(true);
         
         // Close modal
         setShowSignOutModal(false);

@@ -15,6 +15,22 @@ const IdRequests = () => {
     const [filterStatus, setFilterStatus] = useState("all");
     const [searchRef, setSearchRef] = useState("");
 
+    // Utility: build absolute image URL from possible fields
+    const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const toAbsoluteUrl = (value) => {
+        if (!value) return null;
+        if (typeof value !== "string") return null;
+        if (value.startsWith("http://") || value.startsWith("https://")) return value;
+        const path = value.startsWith("/") ? value : `/${value}`;
+        return `${API_BASE}${path}`;
+    };
+    const pickFirst = (obj, keys) => {
+        for (const k of keys) {
+            if (obj && obj[k]) return obj[k];
+        }
+        return null;
+    };
+
     useEffect(() => {
         fetchRequests();
     }, []);
@@ -23,7 +39,9 @@ const IdRequests = () => {
         try {
             const response = await axios.get("http://localhost:5000/api/requests");
             // Filter only ID requests from the response
-            const idRequests = response.data.filter(item => item.type === 'Create ID');
+            const idRequests = response.data
+                .filter(item => item.type === 'Create ID')
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             setRequests(idRequests);
             setLoading(false);
         } catch (err) {
@@ -333,6 +351,50 @@ const IdRequests = () => {
                                         <span className="value">{new Date(selectedRequest.appointment_date).toLocaleString()}</span>
                                     </div>
                                 )}
+                            </div>
+
+                            {/* Images Section */}
+                            <div style={{ marginTop: 16 }}>
+                                <h4 style={{ margin: 0, marginBottom: 8 }}>Submitted Images</h4>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                    {/* Government ID */}
+                                    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <i className="fas fa-id-card" style={{ color: '#6366f1' }}></i>
+                                            <span style={{ fontWeight: 600 }}>Government ID</span>
+                                        </div>
+                                        {(() => {
+                                            const idVal = pickFirst(selectedRequest, [
+                                                'id_image_url', 'id_image', 'idImageUrl', 'idImagePath', 'idImage'
+                                            ]);
+                                            const src = toAbsoluteUrl(idVal);
+                                            return src ? (
+                                                <img src={src} alt="Government ID" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                            ) : (
+                                                <div style={{ fontSize: 13, color: '#6b7280' }}>No ID image available</div>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Live Selfie */}
+                                    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <i className="fas fa-camera" style={{ color: '#6366f1' }}></i>
+                                            <span style={{ fontWeight: 600 }}>Live Selfie</span>
+                                        </div>
+                                        {(() => {
+                                            const selfieVal = pickFirst(selectedRequest, [
+                                                'selfie_image_url', 'selfie_image', 'selfieImageUrl', 'selfieImagePath', 'selfieImage'
+                                            ]);
+                                            const src = toAbsoluteUrl(selfieVal);
+                                            return src ? (
+                                                <img src={src} alt="Live Selfie" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                            ) : (
+                                                <div style={{ fontSize: 13, color: '#6b7280' }}>No selfie image available</div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div className="modal-actions">
