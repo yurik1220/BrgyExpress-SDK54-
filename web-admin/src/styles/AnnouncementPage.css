@@ -436,6 +436,8 @@
     max-width: 600px;
     max-height: 90vh;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
     animation: modalSlideIn 0.3s ease;
 }
@@ -485,6 +487,8 @@
 .announcement-form {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0; /* allow children flex overflow properly */
 }
 
 .modal-body {
@@ -568,6 +572,9 @@
     display: flex;
     gap: 12px;
     justify-content: flex-end;
+    background: white;
+    position: sticky;
+    bottom: 0;
 }
 
 .btn-secondary, .btn-primary {

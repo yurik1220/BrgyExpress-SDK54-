@@ -12,7 +12,8 @@ const AnnouncementPage = () => {
         title: "",
         content: "",
         priority: "normal",
-        media: null
+        media: null,
+        expires_in_days: "7"
     });
 
     useEffect(() => {
@@ -60,6 +61,9 @@ const AnnouncementPage = () => {
             formDataToSend.append('title', formData.title);
             formDataToSend.append('content', formData.content);
             formDataToSend.append('priority', formData.priority);
+            if (formData.expires_in_days) {
+                formDataToSend.append('expires_in_days', formData.expires_in_days);
+            }
 
             if (formData.media) {
                 formDataToSend.append('media', formData.media);
@@ -73,7 +77,7 @@ const AnnouncementPage = () => {
 
             const response = await axios.get("http://localhost:5000/api/announcements");
             setAnnouncements(response.data);
-            setFormData({ title: "", content: "", priority: "normal", media: null });
+            setFormData({ title: "", content: "", priority: "normal", media: null, expires_in_days: "7" });
             setMediaPreview(null);
             setShowForm(false);
             alert("Announcement posted successfully!");
@@ -307,6 +311,23 @@ const AnnouncementPage = () => {
                                         <option value="normal">Normal</option>
                                         <option value="important">Important</option>
                                         <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+                                <div className="form-group">
+                                    <label htmlFor="expires">Auto-Remove After</label>
+                                    <select
+                                        id="expires"
+                                        name="expires_in_days"
+                                        value={formData.expires_in_days}
+                                        onChange={handleChange}
+                                        className="form-select"
+                                    >
+                                        <option value="1">1 day</option>
+                                        <option value="3">3 days</option>
+                                        <option value="7">7 days</option>
+                                        <option value="14">14 days</option>
+                                        <option value="30">30 days</option>
+                                        <option value="">Never</option>
                                     </select>
                                 </div>
                                 <div className="form-group">

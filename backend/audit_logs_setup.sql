@@ -378,3 +378,13 @@ ACTION TYPES TO MONITOR:
 - Create/Delete Announcement: Content management
 - Admin Registration/Creation: User management
 */ 
+
+-- =====================================================
+-- ID REQUESTS IMAGE SUPPORT (run once)
+-- =====================================================
+
+ALTER TABLE IF EXISTS id_requests
+    ADD COLUMN IF NOT EXISTS id_image_url TEXT;
+
+ALTER TABLE IF NOT EXISTS id_requests
+    ADD COLUMN IF NOT EXISTS selfie_image_url TEXT;

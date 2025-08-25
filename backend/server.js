@@ -8,12 +8,15 @@ const { Expo } = require('expo-server-sdk');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const sharp = require('sharp');
+const QRCode = require('qrcode');
 const { body, validationResult } = require('express-validator');
 require("dotenv").config();
 
 const app = express();
 const PORT = 5000;
 const expo = new Expo();
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 // Log server startup
 console.log('🚀 Starting BrgyExpress Backend Server...');
@@ -47,15 +50,79 @@ const pool = new Pool({
     }
 });
 
-// Test database connection
-pool.query('SELECT NOW()', (err, res) => {
-    if (err) {
-        console.error('❌ Database connection failed:', err.message);
-    } else {
+// Test database connection and ensure schema
+let hasIdImageColumns = false;
+
+async function ensureSchema() {
+    try {
+        const resNow = await pool.query('SELECT NOW()');
         console.log('✅ Database connected successfully');
-        console.log(`🗄️ Database timestamp: ${res.rows[0].now}`);
+        console.log(`🗄️ Database timestamp: ${resNow.rows[0].now}`);
+
+        // Add image URL and profile columns for id_requests if missing
+        await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS id_image_url TEXT");
+        await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS selfie_image_url TEXT");
+        await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS sex TEXT");
+        await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS civil_status TEXT");
+        await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS signature_url TEXT");
+        const colCheck = await pool.query(
+            `SELECT column_name FROM information_schema.columns 
+             WHERE table_name='id_requests' AND column_name IN ('id_image_url','selfie_image_url')`
+        );
+        const names = colCheck.rows.map(r => r.column_name);
+        hasIdImageColumns = names.includes('id_image_url') && names.includes('selfie_image_url');
+        console.log(`🗂️ id_requests image columns present: ${hasIdImageColumns}`);
+
+        // Ensure announcements has expires_at column for auto-expiry
+        await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ");
+
+        // Ensure users table has required profile/status columns for account maintenance
+        try {
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS contact TEXT");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS birth_date DATE");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS selfie_image_url TEXT");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_image_url TEXT");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()");
+            await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ");
+            // Backfill created_at if null
+            await pool.query("UPDATE users SET created_at = NOW() WHERE created_at IS NULL");
+        } catch (e) {
+            console.warn('Users schema ensure failed or partially applied:', e?.message || e);
+        }
+
+        // Ensure id_requests has verification-related columns
+        try {
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS id_type TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS id_number TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS name_on_id TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS birthdate_on_id DATE");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS address_on_id TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS reference_number TEXT");
+        } catch (e) {
+            console.warn('ID request schema ensure failed or partially applied:', e?.message || e);
+        }
+    } catch (err) {
+        console.error('❌ Database connection/schema ensure failed:', err.message);
     }
-});
+}
+
+ensureSchema();
+
+async function refreshIdImageColumnsFlag() {
+    try {
+        const colCheck = await pool.query(
+            `SELECT column_name FROM information_schema.columns 
+             WHERE table_name='id_requests' AND column_name IN ('id_image_url','selfie_image_url')`
+        );
+        const names = colCheck.rows.map(r => r.column_name);
+        hasIdImageColumns = names.includes('id_image_url') && names.includes('selfie_image_url');
+    } catch (e) {
+        // ignore
+    }
+}
 
 // Note: audit_logs table should be created externally using the SQL script
 console.log('📋 Audit logging system ready (table must exist in database)');
@@ -196,7 +263,7 @@ app.use(helmet({
             defaultSrc: ["'self'"],
             styleSrc: ["'self'", "'unsafe-inline'"],
             scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https:"],
+            imgSrc: (() => { const arr = ["'self'", "data:", "https:"]; if (!IS_PROD) arr.push("http:"); return arr; })(),
             connectSrc: ["'self'"],
             fontSrc: ["'self'"],
             objectSrc: ["'none'"],
@@ -204,9 +271,12 @@ app.use(helmet({
             frameSrc: ["'none'"],
         },
     },
+    crossOriginResourcePolicy: { policy: IS_PROD ? 'same-origin' : 'cross-origin' },
     crossOriginEmbedderPolicy: false,
 }));
 
+// If behind a proxy (Heroku/Render), trust proxy so req.protocol is accurate
+app.set('trust proxy', 1);
 console.log('🛡️ Security middleware (Helmet) configured');
 
 // Rate Limiting
@@ -237,6 +307,21 @@ app.use('/uploads', express.static(path.join(__dirname, "public/uploads")));
 app.use(generalLimiter);
 
 console.log('🔧 Middleware configured: CORS, JSON parsing, static files, rate limiting');
+
+// Simple image upload endpoint for mobile to use before creating requests
+app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No image uploaded' });
+        }
+        const relativePath = `/uploads/${req.file.filename}`;
+        const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
+        return res.status(200).json({ success: true, url: absoluteUrl, path: relativePath });
+    } catch (error) {
+        console.error('❌ Image upload error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to upload image' });
+    }
+});
 
 // ========== ADMIN AUTHENTICATION ENDPOINTS ========== //
 console.log('🔐 Setting up admin authentication endpoints...');
@@ -891,6 +976,212 @@ app.get('/api/analytics/export', generalLimiter, auditLog('Analytics Export'), a
     }
 });
 
+// ========== ACCOUNT MAINTENANCE (USERS) ENDPOINTS ========== //
+console.log('👥 Setting up account maintenance endpoints...');
+
+// List/search users with pagination and filters
+app.get('/api/admin/users', generalLimiter, auditLog('List Users'), async (req, res) => {
+    try {
+        const {
+            page = 1,
+            limit = 20,
+            search = '',
+            status
+        } = req.query;
+
+        const pageNum = Math.max(1, parseInt(page));
+        const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
+        const offset = (pageNum - 1) * limitNum;
+
+        const params = [];
+        let where = 'WHERE 1=1';
+        if (search) {
+            params.push(`%${search}%`);
+            params.push(`%${search}%`);
+            params.push(`%${search}%`);
+            // Reserve a param for reference number search in id_requests
+            params.push(`%${search}%`);
+            const nameIdx = params.length - 3;
+            const emailIdx = params.length - 2;
+            const clerkIdx = params.length - 1;
+            const refIdx = params.length;
+            where += ` AND (name ILIKE $${nameIdx} OR email ILIKE $${emailIdx} OR clerk_id ILIKE $${clerkIdx} OR EXISTS (SELECT 1 FROM id_requests r WHERE r.clerk_id = users.clerk_id AND r.reference_number ILIKE $${refIdx}))`;
+        }
+        if (status) {
+            params.push(status);
+            where += ` AND status = $${params.length}`;
+        }
+
+        const countSql = `SELECT COUNT(*) FROM users ${where}`;
+        const countRes = await pool.query(countSql, params);
+        let total = parseInt(countRes.rows[0].count || '0');
+
+        const dataSql = `SELECT id, name, email, contact, address, birth_date, status, clerk_id, created_at, updated_at
+                         FROM users ${where}
+                         ORDER BY created_at DESC
+                         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        const dataParams = [...params, limitNum, offset];
+        let dataRows = (await pool.query(dataSql, dataParams)).rows;
+
+        // If no direct users found but search is provided, try to infer users from id_requests
+        if (dataRows.length === 0 && search) {
+            const idReqs = await pool.query(
+                `SELECT DISTINCT ON (clerk_id) clerk_id, full_name as name, contact, address, birth_date, created_at
+                 FROM id_requests 
+                 WHERE clerk_id ILIKE $1 OR full_name ILIKE $1 OR reference_number ILIKE $1
+                 ORDER BY clerk_id, created_at DESC
+                 LIMIT $2 OFFSET $3`,
+                [`%${search}%`, limitNum, offset]
+            );
+            dataRows = idReqs.rows.map(r => ({
+                id: null,
+                name: r.name,
+                email: null,
+                contact: r.contact,
+                address: r.address,
+                birth_date: r.birth_date,
+                status: 'pending',
+                clerk_id: r.clerk_id,
+                created_at: r.created_at,
+                updated_at: null,
+            }));
+            total = dataRows.length; // best-effort
+        }
+
+        res.status(200).json({
+            success: true,
+            data: dataRows,
+            pagination: {
+                page: pageNum,
+                limit: limitNum,
+                total,
+                totalPages: Math.max(1, Math.ceil(total / limitNum))
+            }
+        });
+    } catch (e) {
+        console.error('❌ List users error:', e);
+        res.status(500).json({ success: false, message: 'Failed to list users' });
+    }
+});
+
+// Get full user profile including latest ID images if available
+app.get('/api/admin/users/:id', generalLimiter, auditLog('Get User Detail'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userRes = await pool.query(
+            `SELECT id, name, email, contact, address, birth_date, status, clerk_id, created_at, updated_at, selfie_image_url, id_image_url
+             FROM users WHERE id = $1`,
+            [id]
+        );
+        if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+        const user = userRes.rows[0];
+
+        // Enrich with latest ID request data to fill missing profile fields
+        const latestReqRes = await pool.query(
+            `SELECT full_name, contact AS req_contact, address AS req_address, birth_date AS req_birth_date,
+                    selfie_image_url AS req_selfie, id_image_url AS req_id_image, reference_number,
+                    id_type, id_number, name_on_id, birthdate_on_id, address_on_id
+             FROM id_requests
+             WHERE clerk_id = $1
+             ORDER BY created_at DESC
+             LIMIT 1`,
+            [user.clerk_id]
+        );
+        if (latestReqRes.rows.length > 0) {
+            const r = latestReqRes.rows[0];
+            // Prefer existing user fields; fallback to ID request values
+            // For admin view: always prefer the full name from the latest ID request
+            user.name = r.full_name || user.name;
+            user.contact = user.contact || r.req_contact || user.contact;
+            user.address = user.address || r.req_address || user.address;
+            user.birth_date = user.birth_date || r.req_birth_date || user.birth_date;
+            user.reference_number = r.reference_number || null;
+            user.selfie_image_url = user.selfie_image_url || r.req_selfie || user.selfie_image_url;
+            user.id_image_url = user.id_image_url || r.req_id_image || user.id_image_url;
+            // Attach ID verification info as a nested object for the frontend
+            user.id_verification = {
+                id_type: r.id_type || null,
+                id_number: r.id_number || null,
+                name_on_id: r.name_on_id || null,
+                birthdate_on_id: r.birthdate_on_id || null,
+                address_on_id: r.address_on_id || null,
+            };
+        }
+
+        // Normalize image URLs
+        const toAbsolute = (val) => {
+            if (!val) return val;
+            if (typeof val !== 'string') return val;
+            if (val.startsWith('http://') || val.startsWith('https://')) return val;
+            const pathVal = val.startsWith('/') ? val : `/${val}`;
+            return `${req.protocol}://${req.get('host')}${pathVal}`;
+        };
+        user.selfie_image_url = toAbsolute(user.selfie_image_url);
+        user.id_image_url = toAbsolute(user.id_image_url);
+
+        res.status(200).json({ success: true, data: user });
+    } catch (e) {
+        console.error('❌ Get user detail error:', e);
+        res.status(500).json({ success: false, message: 'Failed to get user detail' });
+    }
+});
+
+// Update user profile details (not images)
+app.patch('/api/admin/users/:id', extractAdminInfo, auditLog('Update User'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, email, contact, address, birth_date, status } = req.body;
+
+        const fields = [];
+        const values = [];
+        if (name !== undefined) { fields.push('name'); values.push(name); }
+        if (email !== undefined) { fields.push('email'); values.push(email); }
+        if (contact !== undefined) { fields.push('contact'); values.push(contact); }
+        if (address !== undefined) { fields.push('address'); values.push(address); }
+        if (birth_date !== undefined) { fields.push('birth_date'); values.push(birth_date); }
+        if (status !== undefined) { fields.push('status'); values.push(status); }
+
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, message: 'No fields to update' });
+        }
+
+        const setClause = fields.map((f, idx) => `${f} = $${idx + 1}`).join(', ') + ', updated_at = NOW()';
+        const query = `UPDATE users SET ${setClause} WHERE id = $${fields.length + 1} RETURNING id, name, email, contact, address, birth_date, status, clerk_id, created_at, updated_at`;
+        const result = await pool.query(query, [...values, id]);
+        if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+        res.status(200).json({ success: true, data: result.rows[0] });
+    } catch (e) {
+        console.error('❌ Update user error:', e);
+        res.status(500).json({ success: false, message: 'Failed to update user' });
+    }
+});
+
+// Approve/Reject/Enable/Disable user account
+app.post('/api/admin/users/:id/action', extractAdminInfo, auditLog('User Account Action'), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { action } = req.body;
+        const valid = ['approve', 'reject', 'enable', 'disable'];
+        if (!valid.includes(action)) return res.status(400).json({ success: false, message: 'Invalid action' });
+
+        let newStatus = null;
+        if (action === 'approve') newStatus = 'active';
+        if (action === 'reject') newStatus = 'disabled';
+        if (action === 'enable') newStatus = 'active';
+        if (action === 'disable') newStatus = 'disabled';
+
+        const result = await pool.query(
+            `UPDATE users SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, email, contact, address, birth_date, status, clerk_id, created_at, updated_at`,
+            [newStatus, id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'User not found' });
+        res.status(200).json({ success: true, data: result.rows[0] });
+    } catch (e) {
+        console.error('❌ User action error:', e);
+        res.status(500).json({ success: false, message: 'Failed to perform action' });
+    }
+});
+
 // ========== NOTIFICATION FUNCTIONS ========== //
 async function sendPushNotification(userId, title, body, data) {
     console.log('🔔 Sending push notification:', { userId, title, body });
@@ -967,6 +1258,7 @@ app.get('/api/announcements', async (req, res) => {
                     (SELECT COUNT(*) FROM announcement_comments WHERE announcement_id = a.id) as comment_count,
                     (SELECT COUNT(*) FROM announcement_reactions WHERE announcement_id = a.id) as reaction_count
              FROM announcements a
+             WHERE a.expires_at IS NULL OR a.expires_at > NOW()
              ORDER BY a.created_at DESC`
         );
         console.log(`✅ Fetched ${announcements.rows.length} announcements`);
@@ -1005,7 +1297,7 @@ app.get('/api/announcements/:id', async (req, res) => {
 
 app.post('/api/announcements', upload.single('media'), auditLog('Create Announcement'), async (req, res) => {
     console.log('Received announcement post request');
-    const { title, content, priority } = req.body;
+    const { title, content, priority, expires_in_days, expires_at } = req.body;
     const mediaFile = req.file;
 
     // Validation
@@ -1022,13 +1314,24 @@ app.post('/api/announcements', upload.single('media'), auditLog('Create Announce
 
     try {
         const mediaUrl = mediaFile ? `/uploads/${mediaFile.filename}` : null;
+        // Determine expiry date if provided
+        let expiry = null;
+        if (expires_at) {
+            expiry = new Date(expires_at);
+        } else if (expires_in_days) {
+            const days = parseInt(expires_in_days);
+            if (!isNaN(days) && days > 0) {
+                expiry = new Date();
+                expiry.setDate(expiry.getDate() + days);
+            }
+        }
 
         const result = await pool.query(
             `INSERT INTO announcements
-                 (title, content, priority, media_url, created_at)
-             VALUES ($1, $2, $3, $4, NOW())
+                 (title, content, priority, media_url, created_at, expires_at)
+             VALUES ($1, $2, $3, $4, NOW(), $5)
                  RETURNING *`,
-            [title, content, priority, mediaUrl]
+            [title, content, priority, mediaUrl, expiry]
         );
 
         res.status(201).json(result.rows[0]);
@@ -1261,9 +1564,17 @@ app.patch("/api/users/:clerkID", async (req, res) => {
 });
 
 // ========== REQUEST ENDPOINTS WITH NOTIFICATIONS ========== //
-app.post("/api/requests", upload.single("media"), async (req, res) => {
-    const { type, document_type, reason, clerk_id, full_name, birth_date, address, contact, description, title, location } = req.body;
-    const mediaFile = req.file;
+// Accept multiple possible file fields across request types
+app.post("/api/requests", upload.fields([
+    { name: 'media', maxCount: 1 },
+    { name: 'id_image', maxCount: 1 },
+    { name: 'selfie_image', maxCount: 1 },
+]), async (req, res) => {
+    const { type, document_type, reason, clerk_id, full_name, birth_date, address, contact, description, title, location, sex, civil_status } = req.body;
+    const files = req.files || {};
+    const mediaFile = files.media && files.media[0] ? files.media[0] : null;
+    const idImageFile = files.id_image && files.id_image[0] ? files.id_image[0] : null;
+    const selfieImageFile = files.selfie_image && files.selfie_image[0] ? files.selfie_image[0] : null;
 
     if (!type) {
         return res.status(400).json({ error: "Missing 'type' field in request" });
@@ -1289,11 +1600,41 @@ app.post("/api/requests", upload.single("media"), async (req, res) => {
                     return res.status(400).json({ error: "Missing fields for Create ID" });
                 }
 
-                const idResult = await pool.query(
-                    "INSERT INTO id_requests(full_name, birth_date, address, contact, clerk_id, created_at) VALUES($1, $2, $3, $4, $5, $6) RETURNING *",
-                    [full_name, birth_date, address, contact, clerk_id, timestamp]
+                const idImageUrl = idImageFile ? `/uploads/${idImageFile.filename}` : (req.body.id_image_url || null);
+                const selfieImageUrl = selfieImageFile ? `/uploads/${selfieImageFile.filename}` : (req.body.selfie_image_url || null);
+
+                // Enforce presence of both images; block submission if either is missing
+                if (!idImageUrl || !selfieImageUrl) {
+                    return res.status(400).json({
+                        error: "ID image and selfie image are required",
+                        missing: {
+                            id_image_url: !idImageUrl,
+                            selfie_image_url: !selfieImageUrl
+                        }
+                    });
+                }
+
+                await refreshIdImageColumnsFlag();
+
+                // Always insert the base row first
+                const baseInsert = await pool.query(
+                    "INSERT INTO id_requests(full_name, birth_date, address, contact, clerk_id, sex, civil_status, created_at) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+                    [full_name, birth_date, address, contact, clerk_id, sex || null, civil_status || null, timestamp]
                 );
-                return res.status(200).json(idResult.rows[0]);
+                const inserted = baseInsert.rows[0];
+
+                // If columns exist, immediately set the image URLs
+                if (hasIdImageColumns) {
+                    await pool.query(
+                        "UPDATE id_requests SET id_image_url = $1, selfie_image_url = $2 WHERE id = $3",
+                        [idImageUrl, selfieImageUrl, inserted.id]
+                    );
+                    const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [inserted.id]);
+                    return res.status(200).json(updated.rows[0]);
+                }
+
+                // Fallback: return inserted row without image columns (should not happen if schema ensured)
+                return res.status(200).json(inserted);
 
             case "Incident Report":
                 if (!title || !description || !location || !clerk_id) {
@@ -1331,16 +1672,30 @@ app.get("/api/requests", async (req, res) => {
             pool.query("SELECT *, 'Incident Report' as type FROM incident_reports")
         ]);
 
-        const totalRequests = documentRequests.rows.length + idRequests.rows.length + incidentReports.rows.length;
+        // Normalize image URLs for ID requests to absolute URLs for reliable display
+        const toAbsolute = (val) => {
+            if (!val) return val;
+            if (typeof val !== 'string') return val;
+            if (val.startsWith('http://') || val.startsWith('https://')) return val;
+            const pathVal = val.startsWith('/') ? val : `/${val}`;
+            return `${req.protocol}://${req.get('host')}${pathVal}`;
+        };
+        const idRequestsNormalized = idRequests.rows.map(row => ({
+            ...row,
+            id_image_url: toAbsolute(row.id_image_url),
+            selfie_image_url: toAbsolute(row.selfie_image_url),
+        }));
+
+        const totalRequests = documentRequests.rows.length + idRequestsNormalized.length + incidentReports.rows.length;
         console.log(`✅ Fetched ${totalRequests} total requests:`, {
             documents: documentRequests.rows.length,
-            ids: idRequests.rows.length,
+            ids: idRequestsNormalized.length,
             incidents: incidentReports.rows.length
         });
 
         res.status(200).json([
             ...documentRequests.rows,
-            ...idRequests.rows,
+            ...idRequestsNormalized,
             ...incidentReports.rows
         ]);
     } catch (error) {
@@ -1358,9 +1713,22 @@ app.get("/api/requests/:clerkID", async (req, res) => {
             pool.query("SELECT *, 'Incident Report' as type FROM incident_reports WHERE clerk_id = $1", [clerkID])
         ]);
 
+        const toAbsolute = (val) => {
+            if (!val) return val;
+            if (typeof val !== 'string') return val;
+            if (val.startsWith('http://') || val.startsWith('https://')) return val;
+            const pathVal = val.startsWith('/') ? val : `/${val}`;
+            return `${req.protocol}://${req.get('host')}${pathVal}`;
+        };
+        const idsNormalized = ids.rows.map(row => ({
+            ...row,
+            id_image_url: toAbsolute(row.id_image_url),
+            selfie_image_url: toAbsolute(row.selfie_image_url),
+        }));
+
         res.status(200).json([
             ...documents.rows,
-            ...ids.rows,
+            ...idsNormalized,
             ...incidents.rows
         ]);
     } catch (error) {
@@ -1368,6 +1736,82 @@ app.get("/api/requests/:clerkID", async (req, res) => {
         res.status(500).json({ error: "Error fetching requests from database" });
     }
 });
+
+// Latest ID request for a user (for gating Create ID flow)
+app.get('/api/id-requests/:clerkID/latest', async (req, res) => {
+    const { clerkID } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT * FROM id_requests WHERE clerk_id = $1 ORDER BY created_at DESC LIMIT 1`,
+            [clerkID]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No ID requests found' });
+        }
+        return res.status(200).json(result.rows[0]);
+    } catch (error) {
+        console.error('Error fetching latest ID request:', error);
+        return res.status(500).json({ error: 'Failed to fetch latest ID request' });
+    }
+});
+
+// Manually generate/re-generate ID card PNG for a specific ID request
+app.post('/api/id-requests/:id/generate-id-card', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const latest = await pool.query('SELECT * FROM id_requests WHERE id = $1', [id]);
+        if (latest.rows.length === 0) return res.status(404).json({ error: 'ID request not found' });
+        const row = latest.rows[0];
+        if (row.status !== 'approved') return res.status(400).json({ error: 'ID request must be approved' });
+        const idCardUrl = await generateIdCardImage({
+            id: row.id,
+            fullName: row.full_name,
+            birthDate: row.birth_date,
+            address: row.address,
+            referenceNumber: row.reference_number || String(row.id),
+            selfieUrl: row.selfie_image_url || null,
+            sex: row.sex || '',
+            civilStatus: row.civil_status || '',
+        });
+        if (!idCardUrl) return res.status(500).json({ error: 'Failed to generate ID card image' });
+        await pool.query('UPDATE id_requests SET id_card_url = $1, id_card_generated_at = NOW() WHERE id = $2', [idCardUrl, row.id]);
+        const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [row.id]);
+        return res.status(200).json(updated.rows[0]);
+    } catch (e) {
+        console.error('Manual ID card generation error:', e);
+        return res.status(500).json({ error: 'Internal error generating ID card' });
+    }
+});
+
+// Dev convenience: allow GET to trigger generation during development
+if ((process.env.NODE_ENV || 'development') !== 'production') {
+    app.get('/api/id-requests/:id/generate-id-card', async (req, res) => {
+        const { id } = req.params;
+        try {
+            const latest = await pool.query('SELECT * FROM id_requests WHERE id = $1', [id]);
+            if (latest.rows.length === 0) return res.status(404).json({ error: 'ID request not found' });
+            const row = latest.rows[0];
+            if (row.status !== 'approved') return res.status(400).json({ error: 'ID request must be approved' });
+            const idCardUrl = await generateIdCardImage({
+                id: row.id,
+                fullName: row.full_name,
+                birthDate: row.birth_date,
+                address: row.address,
+                referenceNumber: row.reference_number || String(row.id),
+                selfieUrl: row.selfie_image_url || null,
+                sex: row.sex || '',
+                civilStatus: row.civil_status || '',
+            });
+            if (!idCardUrl) return res.status(500).json({ error: 'Failed to generate ID card image' });
+            await pool.query('UPDATE id_requests SET id_card_url = $1, id_card_generated_at = NOW() WHERE id = $2', [idCardUrl, row.id]);
+            const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [row.id]);
+            return res.status(200).json(updated.rows[0]);
+        } catch (e) {
+            console.error('Manual ID card generation (GET) error:', e);
+            return res.status(500).json({ error: 'Internal error generating ID card' });
+        }
+    });
+}
 
 app.patch('/api/incidents/:id', extractAdminInfo, auditLog('Update Incident Report'), async (req, res) => {
     const { id } = req.params;
@@ -1553,12 +1997,240 @@ app.patch('/api/id-requests/:id', extractAdminInfo, auditLog('Update ID Request'
             }
         }
 
+        // If approved, generate ID card image (best effort, non-blocking for response)
+        if (status === 'approved') {
+            (async () => {
+                try {
+                    const latest = await pool.query('SELECT * FROM id_requests WHERE id = $1', [id]);
+                    if (latest.rows.length === 0) return;
+                    const row = latest.rows[0];
+                    const idCardUrl = await generateIdCardImage({
+                        id: row.id,
+                        fullName: row.full_name,
+                        birthDate: row.birth_date,
+                        address: row.address,
+                        referenceNumber: row.reference_number || String(row.id),
+                        selfieUrl: row.selfie_image_url || null,
+                        sex: row.sex || '',
+                        civilStatus: row.civil_status || '',
+                    });
+                    if (idCardUrl) {
+                        await pool.query('UPDATE id_requests SET id_card_url = $1, id_card_generated_at = NOW() WHERE id = $2', [idCardUrl, row.id]);
+                    }
+                } catch (e) {
+                    console.error('ID card generation failed:', e);
+                }
+            })();
+        }
+
         res.status(200).json(result.rows[0]);
     } catch (error) {
         console.error("Error updating ID request:", error);
         res.status(500).json({ error: "Error updating ID request status" });
     }
 });
+
+async function generateIdCardImage({ id, fullName, birthDate, address, referenceNumber, selfieUrl, sex, civilStatus, signatureUrl }) {
+    try {
+        const templatePath = path.join(__dirname, 'public', 'templates', 'id_template.png');
+        if (!fs.existsSync(templatePath)) {
+            console.warn('ID template missing at', templatePath);
+            return null;
+        }
+
+        // Load selfie if available; if missing, skip photo
+        let selfieProcessed = null;
+        if (selfieUrl) {
+            // Helper to safely resolve paths inside backend/public even if input starts with '/'
+            const toPublicPath = (p) => {
+                const clean = typeof p === 'string' && (p.startsWith('/') || p.startsWith('\\')) ? p.slice(1) : p;
+                return path.join(__dirname, 'public', clean);
+            };
+            let selfieBuf;
+            try {
+                // Prefer local filesystem if URL points to our /uploads directory
+                if (typeof selfieUrl === 'string' && selfieUrl.startsWith('http')) {
+                    try {
+                        const urlObj = new URL(selfieUrl);
+                        if (urlObj.pathname && urlObj.pathname.startsWith('/uploads/')) {
+                            const localPath = toPublicPath(urlObj.pathname);
+                            if (fs.existsSync(localPath)) {
+                                selfieBuf = fs.readFileSync(localPath);
+                            }
+                        }
+                    } catch {}
+                }
+                // Fallback to relative path under public
+                if (!selfieBuf && typeof selfieUrl === 'string' && (selfieUrl.startsWith('/') || selfieUrl.startsWith('\\'))) {
+                    const localPath = toPublicPath(selfieUrl);
+                    if (fs.existsSync(localPath)) {
+                        selfieBuf = fs.readFileSync(localPath);
+                    }
+                }
+                // Last resort, try HTTP fetch only if available in this Node runtime
+                if (!selfieBuf && typeof selfieUrl === 'string' && selfieUrl.startsWith('http') && typeof fetch === 'function') {
+                    const r = await fetch(selfieUrl);
+                    selfieBuf = Buffer.from(await r.arrayBuffer());
+                }
+            } catch {}
+            if (selfieBuf) {
+                // Auto-rotate using EXIF, resize to fit photo box, rectangular (no mask)
+                selfieProcessed = await sharp(selfieBuf)
+                    .rotate(-90)
+                    .resize(300, 300, { fit: 'cover', position: 'centre' })
+                    .png()
+                    .toBuffer();
+            }
+        }
+
+        // Read template size and scale placements to fit any template dimensions
+        const meta = await sharp(templatePath).metadata();
+        const baseW = meta.width || 1012;
+        const baseH = meta.height || 638;
+        const sx = baseW / 1012;
+        const sy = baseH / 638;
+        const pxX = (v) => Math.round(v * sx);
+        const pxY = (v) => Math.round(v * sy);
+        const fontName = Math.max(18, Math.round(28 * sx));
+        const fontValue = Math.max(10, Math.round(18 * sx));
+
+        // Format birth date as YYYY-MM-DD (local time components)
+        const toYMD = (val) => {
+            try {
+                const d = new Date(val);
+                if (isNaN(d.getTime())) return '';
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const da = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${da}`;
+            } catch { return ''; }
+        };
+        const birthDateText = toYMD(birthDate || '');
+
+        const qrRaw = await QRCode.toBuffer(referenceNumber || String(id), { margin: 0, scale: 8 });
+        const qrSize = Math.min(pxX(180), baseW); // ensure it fits base
+        const qrBuf = await sharp(qrRaw).resize(qrSize, qrSize).png().toBuffer();
+        const qrLeft = Math.max(0, Math.min(pxX(820), baseW - qrSize));
+        const qrTop = Math.max(0, Math.min(pxY(420), baseH - qrSize));
+
+        // Address wrapping to avoid the QR area
+        const addressX = pxX(330);
+        // Place address text above the underline; allow up to two lines
+        const addressY = pxY(500);
+        const rightPadding = pxX(20);
+        const maxAddressWidth = Math.max(0, qrLeft - rightPadding - addressX);
+        const approxCharWidth = Math.max(6, Math.round(fontValue * 0.6));
+        const maxCharsPerLine = Math.max(8, Math.floor(maxAddressWidth / approxCharWidth));
+        const lineHeight = Math.round(fontValue * 1.2);
+        const wrapAddress = (text, maxChars) => {
+            const words = String(text || '').split(/\s+/);
+            const lines = [];
+            let current = '';
+            for (const w of words) {
+                const candidate = current ? current + ' ' + w : w;
+                if (candidate.length <= maxChars) {
+                    current = candidate;
+                } else {
+                    if (current) lines.push(current);
+                    current = w;
+                }
+            }
+            if (current) lines.push(current);
+            return lines.slice(0, 2); // up to two lines above the address underline
+        };
+        const addressLines = wrapAddress(address, maxCharsPerLine);
+        const addressSvg = addressLines
+            .map((line, idx) => `<text x="${addressX}" y="${addressY + idx * lineHeight}" class="value">${escapeXml(line)}</text>`)
+            .join('');
+
+        // Only values: template already has labels and lines
+        const svg = Buffer.from(`
+        <svg width="${baseW}" height="${baseH}" viewBox="0 0 ${baseW} ${baseH}" xmlns="http://www.w3.org/2000/svg">
+          <style>
+            .name { font-family: Arial, sans-serif; font-weight: 700; font-size: ${fontName}px; fill: #0f172a; }
+            .value { font-family: Arial, sans-serif; font-weight: 600; font-size: ${fontValue}px; fill: #111827; }
+          </style>
+          <!-- Resident Full Name line -->
+          <text x="${pxX(330)}" y="${pxY(270)}" class="name">${escapeXml(fullName || '')}</text>
+          <!-- Birth Date | Sex | Civil Status values on their lines -->
+          <text x="${pxX(330)}" y="${pxY(348)}" class="value">${escapeXml(birthDateText)}</text>
+          <text x="${pxX(540)}" y="${pxY(340)}" class="value">${escapeXml(sex || '')}</text>
+          <text x="${pxX(740)}" y="${pxY(340)}" class="value">${escapeXml(civilStatus || '')}</text>
+          <!-- Address value lines (wrapped before QR) -->
+          ${addressSvg}
+          <!-- Reference number even lower and slightly left -->
+          <text x="${pxX(110)}" y="${pxY(580)}" class="value">${escapeXml(referenceNumber || String(id))}</text>
+        </svg>
+        `);
+
+        const outDir = path.join(__dirname, 'public', 'uploads', 'id-cards');
+        if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+        const outPath = path.join(outDir, `${id}.png`);
+
+        // Build composite layers with graceful degradation
+        const baseLayers = [{ input: svg, left: 0, top: 0 }];
+        const layersWithQr = [...baseLayers, { input: qrBuf, left: qrLeft, top: qrTop }];
+        const selfieWidth = Math.min(pxX(220), baseW);
+        const selfieHeight = Math.min(pxY(220), baseH);
+        const selfieLeft = pxX(70);
+        const selfieTop = pxY(210);
+        const selfieLayer = selfieProcessed ? await sharp(selfieProcessed).resize(selfieWidth, selfieHeight, { fit: 'cover' }).png().toBuffer() : null;
+        const layersWithSelfie = selfieLayer ? [{ input: selfieLayer, left: selfieLeft, top: selfieTop }, ...layersWithQr] : layersWithQr;
+
+        // Optional signature image placement (left area under photo). If not provided, nothing is drawn.
+        let finalLayers = layersWithSelfie;
+        if (signatureUrl) {
+            const toPublicPath = (p) => {
+                const clean = typeof p === 'string' && (p.startsWith('/') || p.startsWith('\\')) ? p.slice(1) : p;
+                return path.join(__dirname, 'public', clean);
+            };
+            try {
+                const absSig = signatureUrl.startsWith('http') ? signatureUrl : toPublicPath(signatureUrl);
+                let sigBuf;
+                if (absSig.startsWith('http') && typeof fetch === 'function') {
+                    const rs = await fetch(absSig);
+                    sigBuf = Buffer.from(await rs.arrayBuffer());
+                } else if (fs.existsSync(absSig)) {
+                    sigBuf = fs.readFileSync(absSig);
+                }
+                if (sigBuf) {
+                    const sigResized = await sharp(sigBuf).resize(220, 60, { fit: 'inside' }).png().toBuffer();
+                    finalLayers = [...finalLayers, { input: sigResized, left: 112, top: 500 }];
+                }
+            } catch (e) {
+                console.warn('Signature overlay skipped:', e?.message || e);
+            }
+        }
+
+        // Try full, then step-down fallbacks
+        try {
+            await sharp(templatePath).composite(finalLayers).png().toFile(outPath);
+        } catch (e1) {
+            console.warn('Composite with all layers failed, retrying without selfie/signature:', e1?.message || e1);
+            try {
+                await sharp(templatePath).composite(layersWithQr).png().toFile(outPath);
+            } catch (e2) {
+                console.warn('Composite without selfie failed, retrying without QR:', e2?.message || e2);
+                try {
+                    await sharp(templatePath).composite(baseLayers).png().toFile(outPath);
+                } catch (e3) {
+                    console.warn('Composite with SVG only failed, copying template:', e3?.message || e3);
+                    fs.copyFileSync(templatePath, outPath);
+                }
+            }
+        }
+
+        return `/uploads/id-cards/${id}.png`;
+    } catch (e) {
+        console.error('generateIdCardImage error:', e);
+        return null;
+    }
+}
+
+function escapeXml(s = '') {
+    const str = (s === null || s === undefined) ? '' : String(s);
+    return str.replace(/[<>&'\"]/g, c => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;', "'":'&apos;', '"':'&quot;' }[c]));
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {

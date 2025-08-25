@@ -330,24 +330,37 @@ const IncidentReports = () => {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <p>
-                                {actionType === "investigating" 
-                                    ? "Are you sure you want to start investigating this incident?" 
-                                    : "Are you sure you want to mark this incident as resolved?"
-                                }
-                            </p>
-                            <div className="incident-details">
-                                <div className="detail-item">
-                                    <span className="label">Title:</span>
-                                    <span className="value">{selectedReport.title}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="label">Location:</span>
-                                    <span className="value">{selectedReport.location}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="label">Description:</span>
-                                    <span className="value">{selectedReport.description}</span>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
+                                {selectedReport?.media_url && (
+                                    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                                        {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
+                                            <video controls style={{ width: '100%', maxHeight: 360 }}>
+                                                <source src={`http://localhost:5000${selectedReport.media_url}`} />
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        ) : (
+                                            <img src={`http://localhost:5000${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="incident-details">
+                                    <div className="detail-item">
+                                        <span className="label">Title:</span>
+                                        <span className="value">{selectedReport.title}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="label">Location:</span>
+                                        <span className="value">{selectedReport.location}</span>
+                                    </div>
+                                    <div className="detail-item">
+                                        <span className="label">Date:</span>
+                                        <span className="value">{new Date(selectedReport.created_at).toLocaleString()}</span>
+                                    </div>
+                                    <div className="detail-item" style={{ display: 'block' }}>
+                                        <span className="label">Description:</span>
+                                        <div style={{ color: '#1e293b', fontWeight: 500, marginTop: 6 }}>{selectedReport.description}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>

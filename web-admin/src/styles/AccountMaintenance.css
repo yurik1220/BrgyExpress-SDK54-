@@ -1,0 +1,103 @@
+.account-maintenance-container {
+    padding: 24px;
+    background: #f8fafc;
+    min-height: 100vh;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header icon color override for Account Maintenance */
+.header-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 16px -4px rgba(245, 158, 11, 0.3);
+}
+
+/* Table styles */
+.requests-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.requests-table thead th {
+    text-align: left;
+    font-weight: 700;
+    color: #475569;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.requests-table tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #eaeef3;
+    color: #0f172a;
+    font-size: 14px;
+    vertical-align: middle;
+}
+
+.requests-table tbody tr:hover {
+    background: #f9fbff;
+}
+
+.pagination {
+    background: #fff;
+    border-top: 1px solid #e2e8f0;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #fbbf24);
+    color: #111827;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.action-btn.view {
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+/* Larger modal variant for wide profile view */
+.large-modal {
+    max-width: 1280px;
+    width: 96%;
+}
+
+/* Reduce internal modal padding to fit more content without scroll */
+.modal-body {
+    padding: 16px;
+}
+
+.modal {
+    max-height: 88vh;
+}
+
+

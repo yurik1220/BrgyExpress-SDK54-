@@ -51,6 +51,12 @@ const Sidebar = ({ onSignOut }) => {
                         Analytics
                     </NavLink>
                 </li>
+                <li>
+                    <NavLink to="/account-maintenance" className={({ isActive }) => isActive ? 'active' : ''}>
+                        <i className="fas fa-users-cog"></i>
+                        Acct. Maintenance
+                    </NavLink>
+                </li>
 
             </ul>
             
