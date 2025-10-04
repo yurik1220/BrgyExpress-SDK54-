@@ -48,7 +48,7 @@ require("dotenv").config();
 // Initialize the Express application and global utilities
 // Create our Express app instance; this is the main server object
 const app = express();
-const PORT = 5000; // API server port (configurable via process manager if needed)
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000; // Use Render's PORT when provided
 const expo = new Expo(); // Expo notifications client used for push notifications
 const IS_PROD = process.env.NODE_ENV === 'production';
 
@@ -2317,6 +2317,21 @@ app.use((err, req, res, next) => {
         error: 'Internal server error',
         message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
     });
+});
+
+// Basic health and root routes for platform checks
+app.get('/', (req, res) => {
+    res.status(200).send('BrgyExpress API is running');
+});
+
+app.get('/health', async (req, res) => {
+    try {
+        // simple DB check
+        const now = await pool.query('SELECT NOW()');
+        res.status(200).json({ status: 'ok', time: now.rows[0].now });
+    } catch (e) {
+        res.status(500).json({ status: 'db_error' });
+    }
 });
 
 // 404 handler
