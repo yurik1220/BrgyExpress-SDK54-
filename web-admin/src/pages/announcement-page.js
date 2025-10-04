@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
+import ConfirmationModal from "../components/ConfirmationModal";
 import "../styles/AnnouncementPage.css";
 
 const AnnouncementPage = () => {
@@ -16,10 +17,14 @@ const AnnouncementPage = () => {
         expires_in_days: "7"
     });
 
+    // Modal states
+    const [confirmState, setConfirmState] = useState({ isOpen: false, title: "", message: "", onConfirm: null });
+    const [infoState, setInfoState] = useState({ isOpen: false, title: "", message: "", confirmText: "OK" });
+
     useEffect(() => {
         const fetchAnnouncements = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/announcements");
+                const response = await api.get("/api/announcements");
                 setAnnouncements(response.data);
             } catch (err) {
                 setError("Failed to load announcements");
@@ -52,7 +57,7 @@ const AnnouncementPage = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!formData.title || !formData.content) {
-            alert("Please fill in all required fields");
+            setInfoState({ isOpen: true, title: "Missing required fields", message: "Please fill in both Title and Content.", confirmText: "OK" });
             return;
         }
 
@@ -69,37 +74,43 @@ const AnnouncementPage = () => {
                 formDataToSend.append('media', formData.media);
             }
 
-            await axios.post("http://localhost:5000/api/announcements", formDataToSend, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                }
-            });
+            // Do not set Content-Type manually; let Axios/browser set proper multipart boundaries
+            await api.post("/api/announcements", formDataToSend);
 
-            const response = await axios.get("http://localhost:5000/api/announcements");
+            const response = await api.get("/api/announcements");
             setAnnouncements(response.data);
             setFormData({ title: "", content: "", priority: "normal", media: null, expires_in_days: "7" });
             setMediaPreview(null);
             setShowForm(false);
-            alert("Announcement posted successfully!");
+            setInfoState({ isOpen: true, title: "Success", message: "Announcement posted successfully.", confirmText: "Great" });
         } catch (err) {
             console.error('Error posting announcement:', err);
-            alert("Failed to post announcement");
+            const message = err?.response?.data?.error || "Failed to post announcement";
+            setInfoState({ isOpen: true, title: "Error", message, confirmText: "Close" });
         }
     };
 
-    const handleDelete = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this announcement?")) return;
-
+    const performDelete = async (id) => {
         try {
-            await axios.delete(`http://localhost:5000/api/announcements/${id}`, {
+            await api.delete(`/api/announcements/${id}`, {
                 headers: {
                     'x-clerk-id': localStorage.getItem('clerk_id')
                 }
             });
             setAnnouncements(prev => prev.filter(a => a.id !== id));
         } catch (err) {
-            alert("Failed to delete announcement");
+            const message = err?.response?.data?.error || "Failed to delete announcement";
+            setInfoState({ isOpen: true, title: "Error", message, confirmText: "Close" });
         }
+    };
+
+    const handleDelete = (id) => {
+        setConfirmState({
+            isOpen: true,
+            title: "Delete Announcement",
+            message: "Are you sure you want to delete this announcement? This action cannot be undone.",
+            onConfirm: () => performDelete(id)
+        });
     };
 
     if (loading) return (
@@ -208,7 +219,7 @@ const AnnouncementPage = () => {
                                     <div className="announcement-media">
                                         {announcement.media_url.endsWith('.pdf') ? (
                                             <a 
-                                                href={`http://localhost:5000${announcement.media_url}`} 
+                                                href={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${announcement.media_url}`} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="media-link pdf"
@@ -219,20 +230,20 @@ const AnnouncementPage = () => {
                                         ) : announcement.media_url.match(/\.(jpg|jpeg|png|gif)$/i) ? (
                                             <div className="media-image">
                                                 <img 
-                                                    src={`http://localhost:5000${announcement.media_url}`} 
+                                                    src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${announcement.media_url}`} 
                                                     alt="Announcement media" 
                                                 />
                                             </div>
                                         ) : announcement.media_url.match(/\.(mp4|webm|ogg)$/i) ? (
                                             <div className="media-video">
                                                 <video controls>
-                                                    <source src={`http://localhost:5000${announcement.media_url}`} />
+                                                    <source src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${announcement.media_url}`} />
                                                     Your browser does not support the video tag.
                                                 </video>
                                             </div>
                                         ) : (
                                             <a 
-                                                href={`http://localhost:5000${announcement.media_url}`} 
+                                                href={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${announcement.media_url}`} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="media-link file"
@@ -367,6 +378,30 @@ const AnnouncementPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Confirmation modal for deletes */}
+            <ConfirmationModal
+                isOpen={confirmState.isOpen}
+                title={confirmState.title}
+                message={confirmState.message}
+                onCancel={() => setConfirmState({ isOpen: false, title: "", message: "", onConfirm: null })}
+                onConfirm={() => {
+                    const fn = confirmState.onConfirm;
+                    setConfirmState({ isOpen: false, title: "", message: "", onConfirm: null });
+                    if (typeof fn === 'function') fn();
+                }}
+            />
+
+            {/* Informational modal for success/errors */}
+            <ConfirmationModal
+                isOpen={infoState.isOpen}
+                title={infoState.title}
+                message={infoState.message}
+                confirmText={infoState.confirmText}
+                cancelText="Close"
+                onCancel={() => setInfoState({ ...infoState, isOpen: false })}
+                onConfirm={() => setInfoState({ ...infoState, isOpen: false })}
+            />
         </div>
     );
 };

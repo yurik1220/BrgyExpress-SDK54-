@@ -5,6 +5,8 @@ import {
     View, Text, TextInput, TouchableOpacity,
     Image, ActivityIndicator, Alert,
     KeyboardAvoidingView, Platform, SafeAreaView,
+    ScrollView,
+    Switch,
 } from "react-native";
 // Import camera, location, biometric auth, and routing utilities
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
@@ -68,6 +70,24 @@ const IncidentReportScreen = () => {
     const cameraRef = useRef<CameraView>(null); // Ref for accessing camera actions
     const [permission, requestPermission] = useCameraPermissions(); // Ask camera permission
 
+    //  Additional UI state
+    const categories = [
+        "Theft",
+        "Assault",
+        "Fire",
+        "Accident",
+        "Disturbance",
+        "Others",
+    ];
+    const urgencies = ["Low", "Medium", "High"] as const;
+    const [selectedCategory, setSelectedCategory] = useState<string>("");
+    const [selectedUrgency, setSelectedUrgency] = useState<string>("");
+    const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
+    const [addressText, setAddressText] = useState<string>("");
+    const [reportedAt, setReportedAt] = useState<string>("");
+    const [isCategoryOpen, setIsCategoryOpen] = useState<boolean>(false);
+    const [isUrgencyOpen, setIsUrgencyOpen] = useState<boolean>(false);
+
     //  useEffect runs on component mount
     useEffect(() => {
         (async () => {
@@ -81,6 +101,27 @@ const IncidentReportScreen = () => {
             // Get user's current location
             const location = await Location.getCurrentPositionAsync({});
             setUserLocation([location.coords.longitude, location.coords.latitude]);
+
+            // Reverse geocode to readable address
+            try {
+                const geocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                });
+                if (geocode && geocode.length > 0) {
+                    const g = geocode[0];
+                    const line = [g.name, g.street, g.subregion, g.region]
+                        .filter(Boolean)
+                        .join(", ");
+                    setAddressText(line);
+                }
+            } catch (e) {
+                // Fallback to raw coords if reverse geocoding fails
+                setAddressText(`${location.coords.latitude.toFixed(5)}, ${location.coords.longitude.toFixed(5)}`);
+            }
+
+            // Set timestamp
+            setReportedAt(new Date().toISOString());
 
             // Request camera permission if not already granted
             if (!permission?.granted) {
@@ -118,8 +159,8 @@ const IncidentReportScreen = () => {
 
     //  Handle initial form validation before submission
     const handleSubmit = async () => {
-        if (!title || !description || !media) {
-            Alert.alert("Missing Fields", "Please fill out all fields and take a photo.");
+        if (!title || !description || !media || !selectedCategory || !selectedUrgency) {
+            Alert.alert("Missing Fields", "Please complete all fields, choose a category and urgency, and take a photo.");
             return;
         }
 
@@ -191,6 +232,11 @@ const IncidentReportScreen = () => {
             formData.append("description", description);
             formData.append("location", userLocation?.join(",") || "");
             formData.append("clerk_id", userId);
+            formData.append("category", selectedCategory);
+            formData.append("urgency", selectedUrgency);
+            formData.append("anonymous", String(isAnonymous));
+            if (addressText) formData.append("address", addressText);
+            if (reportedAt) formData.append("reported_at", reportedAt);
 
             if (media) {
                 formData.append("media", {
@@ -315,6 +361,15 @@ const IncidentReportScreen = () => {
                             entering={FadeInDown.duration(800).springify()}
                             style={styles.header}
                         >
+                            <TouchableOpacity
+                                style={styles.headerBackButton}
+                                onPress={() => router.back()}
+                                activeOpacity={0.7}
+                                accessibilityRole="button"
+                                accessibilityLabel="Go back"
+                            >
+                                <Ionicons name="chevron-back" size={24} color="#1e293b" />
+                            </TouchableOpacity>
                             <View style={styles.headerIconContainer}>
                                 <LinearGradient
                                     colors={['#ef4444', '#dc2626']}
@@ -331,6 +386,11 @@ const IncidentReportScreen = () => {
                             entering={FadeInUp.duration(800).delay(200).springify()}
                             style={styles.formContainer}
                         >
+                            <ScrollView 
+                                contentContainerStyle={{ paddingBottom: 24 }}
+                                keyboardShouldPersistTaps="handled"
+                                showsVerticalScrollIndicator={false}
+                            >
                             {/* Title Input */}
                             <View style={styles.inputGroup}>
                                 <Text style={styles.inputLabel}>Title *</Text>
@@ -343,6 +403,78 @@ const IncidentReportScreen = () => {
                                         value={title}
                                         onChangeText={setTitle}
                                     />
+                                </View>
+                            </View>
+
+                            {/* Category Dropdown */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Category *</Text>
+                                <View style={styles.dropdownContainer}>
+                                    <TouchableOpacity
+                                        style={styles.dropdownField}
+                                        onPress={() => {
+                                            setIsCategoryOpen((v) => !v);
+                                            setIsUrgencyOpen(false);
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={selectedCategory ? styles.dropdownValue : styles.dropdownPlaceholder} numberOfLines={1}>
+                                            {selectedCategory || 'Select category'}
+                                        </Text>
+                                        <Ionicons name={isCategoryOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#64748b" style={styles.dropdownChevron} />
+                                    </TouchableOpacity>
+                                    {isCategoryOpen && (
+                                        <View style={styles.dropdownOptions}>
+                                            {categories.map((cat) => (
+                                                <TouchableOpacity
+                                                    key={cat}
+                                                    style={styles.dropdownOption}
+                                                    onPress={() => {
+                                                        setSelectedCategory(cat);
+                                                        setIsCategoryOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={[styles.dropdownOptionText, selectedCategory === cat && styles.dropdownOptionTextSelected]}>{cat}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
+                                </View>
+                            </View>
+
+                            {/* Urgency Dropdown */}
+                            <View style={styles.inputGroup}>
+                                <Text style={styles.inputLabel}>Urgency *</Text>
+                                <View style={styles.dropdownContainer}>
+                                    <TouchableOpacity
+                                        style={styles.dropdownField}
+                                        onPress={() => {
+                                            setIsUrgencyOpen((v) => !v);
+                                            setIsCategoryOpen(false);
+                                        }}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={selectedUrgency ? styles.dropdownValue : styles.dropdownPlaceholder} numberOfLines={1}>
+                                            {selectedUrgency || 'Select urgency'}
+                                        </Text>
+                                        <Ionicons name={isUrgencyOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#64748b" style={styles.dropdownChevron} />
+                                    </TouchableOpacity>
+                                    {isUrgencyOpen && (
+                                        <View style={styles.dropdownOptions}>
+                                            {urgencies.map((lvl) => (
+                                                <TouchableOpacity
+                                                    key={lvl}
+                                                    style={styles.dropdownOption}
+                                                    onPress={() => {
+                                                        setSelectedUrgency(lvl);
+                                                        setIsUrgencyOpen(false);
+                                                    }}
+                                                >
+                                                    <Text style={[styles.dropdownOptionText, selectedUrgency === lvl && styles.dropdownOptionTextSelected]}>{lvl}</Text>
+                                                </TouchableOpacity>
+                                            ))}
+                                        </View>
+                                    )}
                                 </View>
                             </View>
 
@@ -359,25 +491,29 @@ const IncidentReportScreen = () => {
                                         <Text style={styles.photoButtonText}>Take Photo</Text>
                                     </View>
                                 </TouchableOpacity>
-                                
-                                {media && (
-                                    <Animated.View 
-                                        entering={FadeIn.duration(300)}
-                                        style={styles.mediaContainer}
-                                    >
-                                        <Image
-                                            source={{ uri: media.uri }}
-                                            style={styles.mediaImage}
-                                            resizeMode="cover"
-                                        />
-                                        <TouchableOpacity 
-                                            style={styles.removeMediaButton}
-                                            onPress={() => setMedia(null)}
-                                        >
-                                            <Ionicons name="close-circle" size={20} color="white" />
-                                        </TouchableOpacity>
-                                    </Animated.View>
-                                )}
+
+                                <View style={styles.mediaFrame}>
+                                    {media ? (
+                                        <Animated.View entering={FadeIn.duration(300)} style={styles.mediaContainer}>
+                                            <Image
+                                                source={{ uri: media.uri }}
+                                                style={styles.mediaImage}
+                                                resizeMode="cover"
+                                            />
+                                            <TouchableOpacity 
+                                                style={styles.removeMediaButton}
+                                                onPress={() => setMedia(null)}
+                                            >
+                                                <Ionicons name="close-circle" size={20} color="white" />
+                                            </TouchableOpacity>
+                                        </Animated.View>
+                                    ) : (
+                                        <View style={styles.mediaPlaceholder}>
+                                            <Ionicons name="image-outline" size={24} color="#94a3b8" />
+                                            <Text style={styles.mediaPlaceholderText}>No photo yet</Text>
+                                        </View>
+                                    )}
+                                </View>
                             </View>
 
                             {/* Description Input */}
@@ -394,6 +530,24 @@ const IncidentReportScreen = () => {
                                         onChangeText={setDescription}
                                     />
                                 </View>
+                            </View>
+
+                            {/* Anonymous Reporting */}
+                            <View style={styles.anonRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.inputLabel}>Report Anonymously</Text>
+                                    <Text style={styles.anonHint}>Your name will not be shared with responders.</Text>
+                                </View>
+                                <Switch
+                                    value={isAnonymous}
+                                    onValueChange={setIsAnonymous}
+                                    thumbColor={isAnonymous ? "#ef4444" : "#e2e8f0"}
+                                    trackColor={{ false: "#e2e8f0", true: "#fecaca" }}
+                                />
+                            </View>
+                            <View style={styles.disclaimerBox}>
+                                <Ionicons name="shield-checkmark" size={18} color="#ef4444" style={{ marginRight: 8 }} />
+                                <Text style={styles.disclaimerText}>False reporting is punishable. Provide truthful and accurate details.</Text>
                             </View>
 
                             {/* Submit Button */}
@@ -415,6 +569,7 @@ const IncidentReportScreen = () => {
                                     </>
                                 )}
                             </TouchableOpacity>
+                            </ScrollView>
                         </Animated.View>
 
                         {/* Warning Modal */}

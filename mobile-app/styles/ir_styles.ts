@@ -25,6 +25,14 @@ export const styles = StyleSheet.create({
         marginBottom: 20,
         paddingTop: 10,
     },
+    headerBackButton: {
+        position: 'absolute',
+        left: 0,
+        top: 8,
+        padding: 6,
+        borderRadius: 999,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+    },
     headerIconContainer: {
         marginBottom: 12,
     },
@@ -71,6 +79,33 @@ export const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
         flex: 1,
+    },
+
+    // Meta row
+    metaRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginBottom: 12,
+    },
+    metaPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        maxWidth: '100%',
+    },
+    metaIcon: {
+        marginRight: 6,
+    },
+    metaText: {
+        color: '#334155',
+        fontSize: 12,
+        maxWidth: '90%',
     },
 
     // Input Groups
@@ -134,25 +169,54 @@ export const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    // Media Preview
-    mediaContainer: {
+    // Chips
+    chipGroup: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    chip: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        backgroundColor: '#f8fafc',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    chipSelected: {
+        backgroundColor: '#fee2e2',
+        borderColor: '#fecaca',
+    },
+    chipText: {
+        color: '#334155',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    chipTextSelected: {
+        color: '#b91c1c',
+    },
+
+    // Media Frame (fixed height to prevent layout shift)
+    mediaFrame: {
         marginTop: 12,
+        height: 160,
         borderRadius: 10,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        backgroundColor: '#f8fafc',
         position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 2,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    mediaContainer: {
+        ...({} as any),
+        width: '100%',
+        height: '100%',
     },
     mediaImage: {
         width: '100%',
-        height: 120,
-        borderRadius: 10,
+        height: '100%',
     },
     removeMediaButton: {
         position: 'absolute',
@@ -161,6 +225,15 @@ export const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 0, 0, 0.6)',
         borderRadius: 10,
         padding: 3,
+    },
+    mediaPlaceholder: {
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    mediaPlaceholderText: {
+        color: '#94a3b8',
+        marginTop: 6,
+        fontSize: 12,
     },
 
     // Submit Button
@@ -187,6 +260,99 @@ export const styles = StyleSheet.create({
     submitButtonText: {
         color: '#ffffff',
         fontSize: 16,
+        fontWeight: '600',
+    },
+
+    // Anonymous toggle and disclaimer
+    anonRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+        marginTop: 4,
+    },
+    anonHint: {
+        color: '#64748b',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    disclaimerBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff7ed',
+        borderColor: '#fed7aa',
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+    },
+    disclaimerText: {
+        color: '#9a3412',
+        fontSize: 12,
+        flex: 1,
+    },
+
+    // Dropdowns
+    dropdownContainer: {
+        position: 'relative',
+    },
+    dropdownField: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#f8fafc',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        paddingHorizontal: 12,
+        minHeight: 44,
+    },
+    dropdownPlaceholder: {
+        color: '#94a3b8',
+        fontSize: 15,
+        flex: 1,
+        paddingVertical: 10,
+        marginRight: 8,
+    },
+    dropdownValue: {
+        color: '#1e293b',
+        fontSize: 15,
+        flex: 1,
+        paddingVertical: 10,
+        marginRight: 8,
+    },
+    dropdownChevron: {
+        marginLeft: 8,
+    },
+    dropdownOptions: {
+        position: 'absolute',
+        top: 50,
+        left: 0,
+        right: 0,
+        backgroundColor: '#ffffff',
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+        overflow: 'hidden',
+        zIndex: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    dropdownOption: {
+        paddingHorizontal: 12,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    dropdownOptionText: {
+        color: '#334155',
+        fontSize: 14,
+    },
+    dropdownOptionTextSelected: {
+        color: '#b91c1c',
         fontWeight: '600',
     },
 

@@ -1,7 +1,11 @@
+// Authentication helpers for the mobile app
+// - tokenCache wraps expo-secure-store to persist session tokens securely
+// - googleOAuth encapsulates OAuth flow startup and post-login user bootstrap
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
 
 export const tokenCache = {
+  // Retrieve a token by key from secure storage. On error, delete and return null.
   async getToken(key: string) {
     try {
       const item = await SecureStore.getItemAsync(key);
@@ -17,6 +21,7 @@ export const tokenCache = {
       return null;
     }
   },
+  // Save a token securely by key
   async saveToken(key: string, value: string) {
     try {
       return SecureStore.setItemAsync(key, value);
@@ -26,6 +31,7 @@ export const tokenCache = {
   },
 };
 
+// Start Google OAuth via Clerk startOAuthFlow and optionally seed a user profile
 export const googleOAuth = async (startOAuthFlow: any) => {
   try {
     const { createdSessionId, setActive, signUp } = await startOAuthFlow({

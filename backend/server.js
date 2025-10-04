@@ -1,8 +1,39 @@
+/*
+  BEGINNER PRIMER (Read once, then skim the code below):
+  - const vs let vs var:
+    • const declares a variable that won't be reassigned (safer defaults). The value can be an object/array that you can still mutate, but you cannot reassign the variable name itself.
+    • let declares a block-scoped variable you can reassign. Prefer this only when you truly need reassignment.
+    • var is function-scoped and has hoisting quirks; avoid it in modern code.
+
+  - require("module"): CommonJS import used in Node.js to load a library. The returned value is whatever the module exports.
+  - async/await: async marks a function as asynchronous; await pauses inside async functions until a Promise resolves (like "wait for this to finish").
+  - Arrow functions: (args) => { ... } compact syntax for functions; they capture "this" from the surrounding scope.
+  - Objects and arrays: { key: value } is an object; [a, b, c] is an array. Use dot or bracket notation to access properties.
+  - Template strings: `Hello ${name}` allows embedding expressions with ${} inside backticks.
+  - Middleware (Express): functions that run before your route handler; can read/modify req/res or block/continue the request.
+  - HTTP methods: GET (read), POST (create), PATCH/PUT (update), DELETE (remove). res.status(code).json(obj) sends a response with JSON.
+  - Try/Catch: try { ... } catch (err) { ... } handles errors thrown inside try.
+  - Environment variables: process.env.X are configuration values supplied outside the code (e.g., from a .env file).
+*/
+
+// Core dependencies and third-party libraries used by the Express backend
+// express: HTTP server and routing
+// cors: Cross-Origin Resource Sharing to allow frontend/mobile to call the API
+// multer: Handle multipart/form-data for file uploads (images, etc.)
+// path, fs: Node.js utilities for file system paths and reading/writing files
+// pg: PostgreSQL client
+// expo-server-sdk: Send push notifications to Expo devices
+// bcrypt: Secure password hashing and verification for admin users
+// express-rate-limit, helmet: Basic security hardening
+// sharp, qrcode: Image processing and QR code generation for ID cards
+// express-validator: Input validation for safer request handling
+// const defines a read-only binding to the imported module; we won't reassign these names
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+// { Pool } pulls the Pool export from the pg module using object destructuring
 const { Pool } = require("pg");
 const { Expo } = require('expo-server-sdk');
 const bcrypt = require('bcrypt');
@@ -11,30 +42,40 @@ const helmet = require('helmet');
 const sharp = require('sharp');
 const QRCode = require('qrcode');
 const { body, validationResult } = require('express-validator');
+// Load environment variables from .env into process.env
 require("dotenv").config();
 
+// Initialize the Express application and global utilities
+// Create our Express app instance; this is the main server object
 const app = express();
-const PORT = 5000;
-const expo = new Expo();
+const PORT = 5000; // API server port (configurable via process manager if needed)
+const expo = new Expo(); // Expo notifications client used for push notifications
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 // Log server startup
+// console.log prints messages to the server terminal (useful for debugging/visibility)
 console.log('🚀 Starting BrgyExpress Backend Server...');
 console.log(`📡 Server will run on port ${PORT}`);
 console.log(`🌐 Environment: ${process.env.NODE_ENV || 'development'}`);
 
-// File storage setup
+// File storage setup: configure multer to store uploads in backend/public/uploads
+// When a file is uploaded, ensure the directory exists and save with a timestamped name
+// Configure how multer stores files on disk: destination (folder) and filename (string)
 const storage = multer.diskStorage({
+    // destination: tells multer where to save uploaded files
     destination: (req, file, cb) => {
         const dir = path.join(__dirname, "public/uploads");
+        // If the folder doesn't exist, create it (recursive ensures parent folders too)
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
+    // filename: control how the uploaded file is named on disk
     filename: (req, file, cb) => {
         cb(null, Date.now() + "-" + file.originalname);
     }
 });
 
+// Create the multer middleware using the storage settings and file size limits
 const upload = multer({
     storage: storage,
     limits: {
@@ -42,34 +83,43 @@ const upload = multer({
     }
 });
 
-// Database connection
+// Database connection: connect once using a Pool. The DATABASE_URL should be set in .env
+// Create a reusable connection pool for PostgreSQL
 const pool = new Pool({
+    // Read the database connection string from environment variables
     connectionString: process.env.DATABASE_URL,
     ssl: {
         rejectUnauthorized: false
     }
 });
 
-// Test database connection and ensure schema
+// On startup: test DB connectivity and ensure important columns/tables exist.
+// This function avoids migration tools for simplicity by using ALTER TABLE IF NOT EXISTS.
 let hasIdImageColumns = false;
 
+// async means this function can use await inside it
 async function ensureSchema() {
     try {
+        // await pauses until the database returns the current timestamp
         const resNow = await pool.query('SELECT NOW()');
         console.log('✅ Database connected successfully');
         console.log(`🗄️ Database timestamp: ${resNow.rows[0].now}`);
 
         // Add image URL and profile columns for id_requests if missing
+        // ALTER TABLE ... IF NOT EXISTS: add columns only if they're missing
         await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS id_image_url TEXT");
         await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS selfie_image_url TEXT");
         await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS sex TEXT");
         await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS civil_status TEXT");
         await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS signature_url TEXT");
+        // Query information_schema to check which columns currently exist
         const colCheck = await pool.query(
             `SELECT column_name FROM information_schema.columns 
              WHERE table_name='id_requests' AND column_name IN ('id_image_url','selfie_image_url')`
         );
+        // .map creates a new array of just the column_name values
         const names = colCheck.rows.map(r => r.column_name);
+        // Remember in memory whether both columns are present
         hasIdImageColumns = names.includes('id_image_url') && names.includes('selfie_image_url');
         console.log(`🗂️ id_requests image columns present: ${hasIdImageColumns}`);
 
@@ -111,6 +161,8 @@ async function ensureSchema() {
 
 ensureSchema();
 
+// Helper: refresh the in-memory flag for presence of image columns
+// Recompute the hasIdImageColumns flag on demand (used before certain inserts)
 async function refreshIdImageColumnsFlag() {
     try {
         const colCheck = await pool.query(
@@ -128,18 +180,26 @@ async function refreshIdImageColumnsFlag() {
 console.log('📋 Audit logging system ready (table must exist in database)');
 
 // Admin Authentication Middleware
+// Attempts to read admin identity from a simple base64 token (for demo purposes)
+// and from an optional admin_username added by the web-admin client in request bodies.
+// Express middleware signature: (req, res, next)
+// next() passes control to the next middleware/route handler
 const extractAdminInfo = async (req, res, next) => {
     try {
         // Try to get admin info from Authorization header
+        // HTTP headers are in req.headers; authorization typically contains a token
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
+            // Remove the 'Bearer ' prefix to get the raw token string
             const token = authHeader.substring(7);
             // Decode the simple token (in production, use JWT)
             try {
+                // Convert from base64 to a normal string like "<id>:<timestamp>"
                 const decoded = Buffer.from(token, 'base64').toString();
                 const [adminId] = decoded.split(':');
                 if (adminId) {
                     // Get admin details from database
+                    // Look up the admin by id to attach identity info to req
                     const result = await pool.query(
                         'SELECT id, username FROM admins WHERE id = $1',
                         [adminId]
@@ -156,7 +216,7 @@ const extractAdminInfo = async (req, res, next) => {
         // Also check for admin info in request body
         if (req.body && req.body.admin_username) {
             req.adminInfo = req.adminInfo || {};
-            req.adminInfo.username = req.body.admin_username;
+            req.adminInfo.username = req.body.admin_username; // Prefer explicit username if provided
         }
         
         next();
@@ -167,12 +227,16 @@ const extractAdminInfo = async (req, res, next) => {
 };
 
 // Audit Log Middleware
+// Wraps res.send to capture request/response details for persistence in audit_logs.
+// It extracts admin identity from middleware/body/response and sanitizes sensitive fields.
+// Higher-order function: returns middleware configured with a specific action label
 const auditLog = (action) => {
     return async (req, res, next) => {
+        // Keep a reference to the original res.send so we can call it later
         const originalSend = res.send;
         
         res.send = function(data) {
-            // Log after response is sent
+            // Delay the logging slightly to ensure response is already flushed
             setTimeout(async () => {
                 try {
                     // Try to get admin info from various sources
@@ -453,6 +517,9 @@ app.post('/api/admin/login', loginLimiter, auditLog('Admin Login'), [
         .isLength({ min: 6 })
         .withMessage('Password must be at least 6 characters long')
 ], async (req, res) => {
+    // Admin login flow:
+    // 1) Validate input; 2) Fetch admin by username; 3) Verify bcrypt password
+    // 4) Generate a simple session token; 5) Return admin (without password) + token
     console.log('🔑 Admin login attempt:', { username: req.body.username, timestamp: new Date().toISOString() });
     
     // Check for validation errors
@@ -526,6 +593,7 @@ app.post('/api/admin/login', loginLimiter, auditLog('Admin Login'), [
 });
 
 // Admin Registration Endpoint (for creating new admin users)
+// Registers admins with bcrypt-hashed passwords and basic role control (admin/super_admin)
 app.post('/api/admin/register', auditLog('Admin Registration'), [
     body('username')
         .trim()

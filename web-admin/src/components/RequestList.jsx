@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import api from '../lib/fetch';
 
 const RequestList = () => {
     const [requests, setRequests] = useState([]);
@@ -7,8 +7,9 @@ const RequestList = () => {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        axios
-            .get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests`)
+        // Example helper component using centralized API client
+        api
+            .get(`/api/requests`)
             .then((res) => {
                 // Handle different possible structures of the response
                 if (Array.isArray(res.data)) {

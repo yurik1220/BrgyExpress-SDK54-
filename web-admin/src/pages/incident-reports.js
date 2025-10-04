@@ -1,5 +1,13 @@
+// Incident Reports admin page
+// Responsibilities:
+// - Fetch all request records then filter Incident Reports only
+// - Split into tabs by status: pending, in_progress, closed
+// - Show details, allow status transitions, and quick map view
+// Data Flow:
+//   GET /api/requests → filter type === 'Incident Report'
+//   PATCH /api/incidents/:id with status ∈ { in_progress, closed }
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
 import "../styles/IncidentReports.css";
 
 const IncidentReports = () => {
@@ -15,10 +23,12 @@ const IncidentReports = () => {
     const [mapUrl, setMapUrl] = useState("");
     const [searchRef, setSearchRef] = useState("");
 
+    // Fetch and categorize incident reports on first render
     useEffect(() => {
         const fetchReports = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/requests");
+                // Use shared API instance so auth headers are attached and base URL is configurable
+                const response = await api.get("/api/requests");
                 // Filter only incident reports from the response
                 const allIncidents = response.data.filter(item => item.type === 'Incident Report');
                 setPendingIncidents(allIncidents.filter(i => !i.status || i.status === 'pending'));
@@ -34,6 +44,7 @@ const IncidentReports = () => {
         fetchReports();
     }, []);
 
+    // Maintain a Google Maps link for the selected report
     useEffect(() => {
         if (selectedReport?.location) {
             const [longitude, latitude] = selectedReport.location.split(",").map(Number);
@@ -41,6 +52,7 @@ const IncidentReports = () => {
         }
     }, [selectedReport]);
 
+    // Triggered by modal actions to advance status
     const handleAction = async () => {
         try {
             const payload = {
@@ -48,8 +60,8 @@ const IncidentReports = () => {
                 resolved_at: new Date().toISOString()
             };
 
-            const response = await axios.patch(
-                `http://localhost:5000/api/incidents/${selectedReport.id}`,
+            const response = await api.patch(
+                `/api/incidents/${selectedReport.id}`,
                 payload
             );
 
@@ -72,6 +84,7 @@ const IncidentReports = () => {
         }
     };
 
+    // Helper: derive visible list based on active tab and optional search filter
     const getCurrentIncidents = () => {
         let incidents = [];
         switch (activeTab) {
@@ -335,11 +348,11 @@ const IncidentReports = () => {
                                     <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
                                         {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
                                             <video controls style={{ width: '100%', maxHeight: 360 }}>
-                                                <source src={`http://localhost:5000${selectedReport.media_url}`} />
+                                                <source src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} />
                                                 Your browser does not support the video tag.
                                             </video>
                                         ) : (
-                                            <img src={`http://localhost:5000${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
+                                            <img src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
                                         )}
                                     </div>
                                 )}

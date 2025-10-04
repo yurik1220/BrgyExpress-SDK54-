@@ -1,3 +1,6 @@
+// Light-weight fetch utilities for the Expo mobile app
+// - fetchAPI: thin wrapper around window.fetch with JSON parsing and error propagation
+// - useFetch: React hook to load data with loading/error states and refetch support
 import { useState, useEffect, useCallback } from "react";
 
 export const fetchAPI = async (url: string, options?: RequestInit) => {

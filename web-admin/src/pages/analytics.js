@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
 import '../styles/Analytics.css';
 
 const Analytics = () => {
@@ -23,7 +23,8 @@ const Analytics = () => {
     // Fetch overview analytics
     const fetchOverviewAnalytics = useCallback(async () => {
         try {
-            const response = await axios.get(`http://localhost:5000/api/analytics/overview?days=${timeRange}`);
+            // Fetch high-level analytics for the selected time window
+            const response = await api.get(`/api/analytics/overview?days=${timeRange}`);
             console.log('Overview Analytics Response:', response.data);
             setOverviewData(response.data);
         } catch (err) {
@@ -42,7 +43,8 @@ const Analytics = () => {
             if (filters.status) params.append('status', filters.status);
             if (filters.location) params.append('location', filters.location);
 
-            const response = await axios.get(`http://localhost:5000/api/analytics/detailed?${params.toString()}`);
+            // Fetch filtered analytics using shared API instance
+            const response = await api.get(`/api/analytics/detailed?${params.toString()}`);
             console.log('Detailed Analytics Response:', response.data);
             setDetailedData(response.data);
         } catch (err) {
@@ -62,7 +64,7 @@ const Analytics = () => {
             if (filters.status) params.append('status', filters.status);
             if (filters.location) params.append('location', filters.location);
 
-            const response = await axios.get(`http://localhost:5000/api/analytics/export?${params.toString()}`, {
+            const response = await api.get(`/api/analytics/export?${params.toString()}`, {
                 responseType: 'blob'
             });
 

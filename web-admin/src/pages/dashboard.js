@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
 import { Link, useNavigate } from "react-router-dom";
 import '../styles/Dashboard.css';
 
@@ -13,7 +13,8 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchRequests = async () => {
             try {
-                const response = await axios.get("http://localhost:5000/api/requests");
+                // Use centralized API client; includes auth and configurable base URL
+                const response = await api.get("/api/requests");
                 console.log('API Response:', response.data);
                 setRequests(response.data);
             } catch (err) {
