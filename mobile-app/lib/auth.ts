@@ -3,6 +3,7 @@
 // - googleOAuth encapsulates OAuth flow startup and post-login user bootstrap
 import * as Linking from "expo-linking";
 import * as SecureStore from "expo-secure-store";
+import { fetchAPI } from "@/lib/fetch";
 
 export const tokenCache = {
   // Retrieve a token by key from secure storage. On error, delete and return null.
@@ -43,8 +44,9 @@ export const googleOAuth = async (startOAuthFlow: any) => {
         await setActive({ session: createdSessionId });
 
         if (signUp.createdUserId) {
-          await fetchAPI("/(api)/user", {
+          await fetchAPI(`${process.env.EXPO_PUBLIC_API_URL}/api/users`, {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               name: `${signUp.firstName} ${signUp.lastName}`,
               email: signUp.emailAddress,

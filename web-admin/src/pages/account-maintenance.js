@@ -29,7 +29,8 @@ const AccountMaintenance = () => {
                 const url = new URL(value);
                 if (!url.pathname.startsWith("/uploads")) return value;
                 const base = new URL(API_BASE);
-                if (url.host !== base.host) {
+                // Rewrite if host or protocol differ to avoid mixed content and stale hosts
+                if (url.host !== base.host || url.protocol !== base.protocol) {
                     return `${API_BASE}${url.pathname}`;
                 }
                 return value;
