@@ -1,6 +1,12 @@
+// Route guard component that only renders children when an admin session is valid.
+// Flow:
+// 1) On mount, check for presence of adminData/adminToken in localStorage.
+// 2) If present, call /api/admin/session via shared axios client to validate.
+// 3) While validating, show a simple full-screen loading indicator.
+// 4) If invalid/expired, clear localStorage and redirect to /login.
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/fetch';
 
 const ProtectedRoute = ({ children }) => {
     const [isValidating, setIsValidating] = useState(true);
@@ -19,8 +25,8 @@ const ProtectedRoute = ({ children }) => {
                     return;
                 }
 
-                // Validate session with backend
-                const response = await axios.get('http://localhost:5000/api/admin/session', {
+                // Validate session with backend via shared API client
+                const response = await api.get('/api/admin/session', {
                     timeout: 5000 // 5 second timeout
                 });
 

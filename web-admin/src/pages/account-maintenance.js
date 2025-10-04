@@ -19,6 +19,34 @@ const AccountMaintenance = () => {
     const [saving, setSaving] = useState(false);
     const [previewSrc, setPreviewSrc] = useState(null);
 
+    // Utility: build absolute image URL from possible fields
+    const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || "http://localhost:5000";
+    const toAbsoluteUrl = (value) => {
+        if (!value || typeof value !== "string") return null;
+        // If already absolute, normalize uploads to current API host if needed
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            try {
+                const url = new URL(value);
+                if (!url.pathname.startsWith("/uploads")) return value;
+                const base = new URL(API_BASE);
+                if (url.host !== base.host) {
+                    return `${API_BASE}${url.pathname}`;
+                }
+                return value;
+            } catch {
+                // fallthrough to relative handling
+            }
+        }
+        const path = value.startsWith("/") ? value : `/${value}`;
+        return `${API_BASE}${path}`;
+    };
+    const pickFirst = (obj, keys) => {
+        for (const k of keys) {
+            if (obj && obj[k]) return obj[k];
+        }
+        return null;
+    };
+
     const fetchUsers = async () => {
         setLoading(true);
         try {
@@ -248,12 +276,12 @@ const AccountMaintenance = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
                                             <span style={{ fontWeight: 600 }}>Uploaded Selfie</span>
                                         </div>
-                                        {selectedUser.selfie_image_url ? (
+                                        {toAbsoluteUrl(pickFirst(selectedUser, ['selfie_image_url','selfie_image','selfieImageUrl','selfieImagePath','selfieImage'])) ? (
                                             <img
-                                                src={selectedUser.selfie_image_url}
+                                                src={toAbsoluteUrl(pickFirst(selectedUser, ['selfie_image_url','selfie_image','selfieImageUrl','selfieImagePath','selfieImage']))}
                                                 alt="Selfie"
                                                 style={{ width: '100%', maxHeight: 180, objectFit: 'contain', background: '#f8fafc', borderRadius: 8, cursor: 'pointer' }}
-                                                onClick={() => setPreviewSrc(selectedUser.selfie_image_url)}
+                                                onClick={() => setPreviewSrc(toAbsoluteUrl(pickFirst(selectedUser, ['selfie_image_url','selfie_image','selfieImageUrl','selfieImagePath','selfieImage'])))}
                                             />
                                         ) : (
                                             <div style={{ fontSize: 13, color: '#6b7280' }}>No selfie image</div>
@@ -263,12 +291,12 @@ const AccountMaintenance = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0' }}>
                                             <span style={{ fontWeight: 600 }}>Valid ID</span>
                                         </div>
-                                        {selectedUser.id_image_url ? (
+                                        {toAbsoluteUrl(pickFirst(selectedUser, ['id_image_url','id_image','idImageUrl','idImagePath','idImage'])) ? (
                                             <img
-                                                src={selectedUser.id_image_url}
+                                                src={toAbsoluteUrl(pickFirst(selectedUser, ['id_image_url','id_image','idImageUrl','idImagePath','idImage']))}
                                                 alt="Valid ID"
                                                 style={{ width: '100%', maxHeight: 180, objectFit: 'contain', background: '#f8fafc', borderRadius: 8, cursor: 'pointer' }}
-                                                onClick={() => setPreviewSrc(selectedUser.id_image_url)}
+                                                onClick={() => setPreviewSrc(toAbsoluteUrl(pickFirst(selectedUser, ['id_image_url','id_image','idImageUrl','idImagePath','idImage'])))}
                                             />
                                         ) : (
                                             <div style={{ fontSize: 13, color: '#6b7280' }}>No ID image</div>

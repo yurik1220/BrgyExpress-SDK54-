@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
+import api from "../lib/fetch";
 import "../styles/IdRequests.css";
 
 const IdRequests = () => {
@@ -16,11 +16,23 @@ const IdRequests = () => {
     const [searchRef, setSearchRef] = useState("");
 
     // Utility: build absolute image URL from possible fields
-    const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+    const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || "http://localhost:5000";
     const toAbsoluteUrl = (value) => {
-        if (!value) return null;
-        if (typeof value !== "string") return null;
-        if (value.startsWith("http://") || value.startsWith("https://")) return value;
+        if (!value || typeof value !== "string") return null;
+        // If already absolute, normalize uploads to current API host if needed
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            try {
+                const url = new URL(value);
+                if (!url.pathname.startsWith("/uploads")) return value;
+                const base = new URL(API_BASE);
+                if (url.host !== base.host) {
+                    return `${API_BASE}${url.pathname}`;
+                }
+                return value;
+            } catch {
+                // fallthrough to relative handling
+            }
+        }
         const path = value.startsWith("/") ? value : `/${value}`;
         return `${API_BASE}${path}`;
     };
@@ -37,7 +49,7 @@ const IdRequests = () => {
 
     const fetchRequests = async () => {
         try {
-            const response = await axios.get("http://localhost:5000/api/requests");
+            const response = await api.get("/api/requests");
             // Filter only ID requests from the response
             const idRequests = response.data
                 .filter(item => item.type === 'Create ID')
@@ -58,7 +70,7 @@ const IdRequests = () => {
 
     const submitAction = async () => {
         try {
-            await axios.patch(`http://localhost:5000/api/id-requests/${selectedRequest.id}`, {
+            await api.patch(`/api/id-requests/${selectedRequest.id}`, {
                 status: actionType,
                 rejection_reason: actionNote,
                 appointment_date: actionType === 'approved' ? new Date().toISOString() : null

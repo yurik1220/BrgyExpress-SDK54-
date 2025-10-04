@@ -1,6 +1,12 @@
+// Admin Login page
+// Flow:
+// - Local state for username/password, loading, and error message
+// - On submit, POST /api/admin/login using shared axios client
+// - On success: persist adminData/adminToken to localStorage, start sessionManager, navigate
+// - On failure: display error feedback
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../lib/fetch';
 import sessionManager from '../lib/sessionManager';
 import './Login.css';
 
@@ -27,7 +33,8 @@ const Login = () => {
         setError('');
 
         try {
-            const response = await axios.post(`http://localhost:5000/api/admin/login`, formData);
+            // Authenticate admin; shared API client will attach base URL
+            const response = await api.post(`/api/admin/login`, formData);
             
             if (response.data.success) {
                 // Store admin data in localStorage
