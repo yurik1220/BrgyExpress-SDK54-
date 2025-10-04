@@ -1315,6 +1315,32 @@ app.post('/api/save-push-token', async (req, res) => {
     }
 });
 
+// ========== USER CREATION/UPSERT (from mobile after Clerk signup) ==========
+app.post('/api/users', async (req, res) => {
+    const { name, clerkId, phonenumber, email } = req.body || {};
+    if (!clerkId || !name) {
+        return res.status(400).json({ success: false, message: 'Missing required fields: name, clerkId' });
+    }
+    try {
+        // Upsert by clerk_id, prefer provided phone/email if present
+        const result = await pool.query(
+            `INSERT INTO users (name, clerk_id, phonenumber, email, created_at)
+             VALUES ($1, $2, $3, $4, NOW())
+             ON CONFLICT (clerk_id)
+             DO UPDATE SET name = EXCLUDED.name,
+                           phonenumber = COALESCE(EXCLUDED.phonenumber, users.phonenumber),
+                           email = COALESCE(EXCLUDED.email, users.email),
+                           updated_at = NOW()
+             RETURNING id, name, clerk_id, phonenumber, email`,
+            [name, clerkId, phonenumber || null, email || null]
+        );
+        return res.status(201).json({ success: true, data: result.rows[0] });
+    } catch (error) {
+        console.error('❌ Error upserting user:', error);
+        return res.status(500).json({ success: false, message: 'Failed to create user' });
+    }
+});
+
 // ========== ANNOUNCEMENTS ENDPOINTS ========== //
 console.log('📢 Setting up announcements endpoints...');
 
@@ -2346,7 +2372,7 @@ app.listen(PORT, () => {
     console.log('🎉 BrgyExpress Backend Server Started!');
     console.log('🎉 ========================================');
     console.log(`🌐 Server URL: http://localhost:${PORT}`);
-    console.log(`📊 Health Check: http://localhost:${PORT}/api/requests`);
+    console.log(`📊 Health Check: http://localhost:${PORT}/health`);
     console.log(`🔐 Admin Login: http://localhost:${PORT}/api/admin/login`);
     console.log('🛡️ Security Features: Rate limiting, Input validation, Session management');
     console.log('📱 Mobile API: Ready for mobile app requests');

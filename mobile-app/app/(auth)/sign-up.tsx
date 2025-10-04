@@ -100,12 +100,13 @@ const SignUp = () => {
             ? form.phoneNumber
             : "+63" + form.phoneNumber;
 
-        // 4. Send user data to the API
-        await fetchAPI("/(api)/user", {
+        // 4. Send user data to the backend API
+        await fetchAPI(`${process.env.EXPO_PUBLIC_API_URL}/api/users`, {
           method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: form.name,
-            phoneNumber: formattedPhoneNumber,
+            phonenumber: formattedPhoneNumber,
             clerkId: result.createdUserId,
             createdAt: new Date().toISOString(),
           }),
