@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import CustomButton from "@/components/CustomButton";
 import { useSignUp } from "@clerk/clerk-expo";
 import { Link, router } from "expo-router";
-import { ReactNativeModal } from "react-native-modal";
+import Modal from "react-native-modal";
 import { fetchAPI } from "@/lib/fetch";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -100,14 +100,14 @@ const SignUp = () => {
             ? form.phoneNumber
             : "+63" + form.phoneNumber;
 
-        // 4. Send user data to the backend API
+        // 4. Send user data to the backend API   
         await fetchAPI(`${process.env.EXPO_PUBLIC_API_URL}/api/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: form.name,
             phonenumber: formattedPhoneNumber,
-            clerkId: result.createdUserId,
+            clerkId: signUp.createdUserId,
             createdAt: new Date().toISOString(),
           }),
         });
@@ -250,7 +250,7 @@ const SignUp = () => {
       </View>
 
       {/* Terms and Conditions Modal */}
-      <ReactNativeModal isVisible={showTermsModal}>
+      <Modal isVisible={showTermsModal}>
         <View className="bg-white px-7 py-9 rounded-2xl min-h-[200px]">
           <View className="items-center mb-4">
             <Ionicons name="alert-circle" size={50} color="#FF6B6B" />
@@ -265,10 +265,10 @@ const SignUp = () => {
             className="mt-2 h-[56px] rounded-xl"
           />
         </View>
-      </ReactNativeModal>
+      </Modal>
 
       {/* Phone Verification Modal */}
-      <ReactNativeModal isVisible={verification.state === "pending"}>
+      <Modal isVisible={verification.state === "pending"}>
         <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
           <View className="flex-row justify-between items-center mb-4">
             <Pressable 
@@ -321,10 +321,10 @@ const SignUp = () => {
             </Text>
           </Pressable>
         </View>
-      </ReactNativeModal>
+      </Modal>
 
       {/* Success Modal */}
-      <ReactNativeModal isVisible={showSuccessModal}>
+      <Modal isVisible={showSuccessModal}>
         <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
           <Image source={images.check} className="w-[110px] h-[110px] mx-auto my-5" />
           <Text className="text-3xl font-JakartaBold text-center">Verified</Text>
@@ -340,7 +340,7 @@ const SignUp = () => {
             className="mt-5 h-[56px] rounded-xl"
           />
         </View>
-      </ReactNativeModal>
+      </Modal>
     </View>
   );
 };

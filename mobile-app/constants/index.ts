@@ -24,9 +24,6 @@ import star from "@/assets/icons/star.png";
 import target from "@/assets/icons/target.png";
 import to from "@/assets/icons/to.png";
 import check from "@/assets/images/check.png";
-import getStarted from "@/assets/images/get-started.png";
-import message from "@/assets/images/message.png";
-import noResult from "@/assets/images/no-result.png";
 import onboarding1 from "@/assets/images/onboarding1.png";
 import onboarding2 from "@/assets/images/onboarding2.png";
 import onboarding3 from "@/assets/images/onboarding3.png";
@@ -35,7 +32,6 @@ import logo from "@/assets/images/logo.png";
 import slideshow1 from "@/assets/images/slideshow1.png";
 import slideshow2 from "@/assets/images/slideshow2.png";
 import slideshow3 from "@/assets/images/slideshow3.png";
-import warning from "@/assets/images/warning.png";
 import incident from "@/assets/images/incident_button.png";
 import request from "@/assets/images/request_button.png";
 import id from "@/assets/images/id_button.png";
@@ -44,16 +40,12 @@ export const images = {
   onboarding1,
   onboarding2,
   onboarding3,
-  getStarted,
   signUpCar,
   check,
-  noResult,
-  message,
   logo,
   slideshow1,
   slideshow2,
   slideshow3,
-  warning,
   incident,
   request,
   id,

@@ -7,7 +7,13 @@ export const fetchAPI = async (url: string, options?: RequestInit) => {
   try {
     const response = await fetch(url, options);
     if (!response.ok) {
-      new Error(`HTTP error! status: ${response.status}`);
+      const text = await response.text().catch(() => '');
+      throw new Error(`HTTP ${response.status} ${response.statusText}${text ? ` - ${text}` : ''}`);
+    }
+    // Some endpoints may return non-JSON or empty responses; guard parsing
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      return { success: true } as any;
     }
     return await response.json();
   } catch (error) {
