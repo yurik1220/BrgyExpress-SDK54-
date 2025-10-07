@@ -447,8 +447,10 @@ const CreateIDScreen = () => {
     setSelfieImageUrl(null);
   };
   const uploadImageToServer = async (localUri: string): Promise<string> => {
-    const formData: any = new FormData();
     const fileName = localUri.split('/').pop() || `image-${Date.now()}.jpg`;
+
+    // Fallback: upload to our backend which persists or forwards to storage
+    const formData: any = new FormData();
     formData.append('image', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
     const resp = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/upload-image`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
