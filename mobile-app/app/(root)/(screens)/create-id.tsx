@@ -448,6 +448,26 @@ const CreateIDScreen = () => {
   };
   const uploadImageToServer = async (localUri: string): Promise<string> => {
     const fileName = localUri.split('/').pop() || `image-${Date.now()}.jpg`;
+    // Try Cloudinary direct upload first if env vars are present
+    const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
+    if (cloudName && uploadPreset) {
+      try {
+        const fd: any = new FormData();
+        fd.append('file', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
+        fd.append('upload_preset', uploadPreset);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+          method: 'POST',
+          body: fd,
+        });
+        if (!res.ok) throw new Error(`Cloudinary ${res.status}`);
+        const json = await res.json();
+        if (json && json.secure_url) return json.secure_url as string;
+        throw new Error('Cloudinary missing secure_url');
+      } catch (e) {
+        // Fall back to backend upload below
+      }
+    }
 
     // Fallback: upload to our backend which persists or forwards to storage
     const formData: any = new FormData();

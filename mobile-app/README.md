@@ -1,5 +1,17 @@
 # Welcome to your Expo app 👋
 
+## Cloudinary uploads (optional, recommended)
+
+Set these env vars to enable direct uploads to Cloudinary from the mobile app (free tier works):
+
+```
+EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=your_cloud_name
+EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=unsigned_preset
+```
+
+Notes:
+- Create an unsigned upload preset in Cloudinary and allow image uploads.
+- If these are not set, the app falls back to uploading via `EXPO_PUBLIC_API_URL` at `/api/upload-image`.
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
 ## Get started
