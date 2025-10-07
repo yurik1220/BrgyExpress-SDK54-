@@ -23,22 +23,12 @@ const AccountMaintenance = () => {
     const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || "http://localhost:5000";
     const toAbsoluteUrl = (value) => {
         if (!value || typeof value !== "string") return null;
-        // If already absolute, normalize uploads to current API host if needed
-        if (value.startsWith("http://") || value.startsWith("https://")) {
-            try {
-                const url = new URL(value);
-                if (!url.pathname.startsWith("/uploads")) return value;
-                const base = new URL(API_BASE);
-                // Rewrite if host or protocol differ to avoid mixed content and stale hosts
-                if (url.host !== base.host || url.protocol !== base.protocol) {
-                    return `${API_BASE}${url.pathname}`;
-                }
-                return value;
-            } catch {
-                // fallthrough to relative handling
-            }
+        const v = value.trim();
+        // If already absolute, use as-is (do not rewrite hosts)
+        if (v.startsWith("http://") || v.startsWith("https://")) {
+            return v;
         }
-        const path = value.startsWith("/") ? value : `/${value}`;
+        const path = v.startsWith("/") ? v : `/${v}`;
         return `${API_BASE}${path}`;
     };
     const pickFirst = (obj, keys) => {
