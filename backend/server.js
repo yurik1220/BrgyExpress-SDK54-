@@ -33,6 +33,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require('crypto');
 // { Pool } pulls the Pool export from the pg module using object destructuring
 const { Pool } = require("pg");
 const { Expo } = require('expo-server-sdk');
@@ -78,6 +79,14 @@ const storage = multer.diskStorage({
 // Create the multer middleware using the storage settings and file size limits
 const upload = multer({
     storage: storage,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
+
+// Memory storage for DB-backed uploads (avoids ephemeral disk)
+const memUpload = multer({
+    storage: multer.memoryStorage(),
     limits: {
         fileSize: 10 * 1024 * 1024 // 10MB limit
     }
@@ -153,6 +162,21 @@ async function ensureSchema() {
             await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS reference_number TEXT");
         } catch (e) {
             console.warn('ID request schema ensure failed or partially applied:', e?.message || e);
+        }
+
+        // Create table for DB-backed file uploads (persisted in Postgres)
+        try {
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS file_uploads (
+                    id TEXT PRIMARY KEY,
+                    filename TEXT,
+                    mime_type TEXT,
+                    content BYTEA NOT NULL,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            `);
+        } catch (e) {
+            console.warn('file_uploads schema ensure failed or partially applied:', e?.message || e);
         }
     } catch (err) {
         console.error('❌ Database connection/schema ensure failed:', err.message);
@@ -367,18 +391,44 @@ const generalLimiter = rateLimit({
 // Middleware
 app.use(cors());
 app.use(express.json());
+// Serve DB-backed uploads via /uploads/:id before static middleware
+app.get('/uploads/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        if (!id || id.includes('/') || id.includes('..')) return res.status(400).send('Bad request');
+        const result = await pool.query('SELECT filename, mime_type, content FROM file_uploads WHERE id = $1', [id]);
+        if (result.rows.length === 0) return next(); // fall through to static or 404
+        const row = result.rows[0];
+        if (row.mime_type) res.setHeader('Content-Type', row.mime_type);
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        const dispositionName = row.filename || `${id}`;
+        res.setHeader('Content-Disposition', `inline; filename="${dispositionName.replace(/"/g, '')}"`);
+        return res.send(Buffer.from(row.content));
+    } catch (e) {
+        return next(e);
+    }
+});
+
 app.use('/uploads', express.static(path.join(__dirname, "public/uploads")));
 app.use(generalLimiter);
 
 console.log('🔧 Middleware configured: CORS, JSON parsing, static files, rate limiting');
 
 // Simple image upload endpoint for mobile to use before creating requests
-app.post('/api/upload-image', upload.single('image'), async (req, res) => {
+app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'No image uploaded' });
         }
-        const relativePath = `/uploads/${req.file.filename}`;
+        // Persist image in Postgres
+        const id = (crypto.randomUUID && crypto.randomUUID()) || (Date.now().toString(36) + '-' + Math.random().toString(16).slice(2));
+        const filename = req.file.originalname || `image-${Date.now()}.jpg`;
+        const mimeType = req.file.mimetype || 'application/octet-stream';
+        await pool.query(
+            'INSERT INTO file_uploads (id, filename, mime_type, content) VALUES ($1, $2, $3, $4)',
+            [id, filename, mimeType, req.file.buffer]
+        );
+        const relativePath = `/uploads/${id}`;
         const absoluteUrl = `${req.protocol}://${req.get('host')}${relativePath}`;
         return res.status(200).json({ success: true, url: absoluteUrl, path: relativePath });
     } catch (error) {
