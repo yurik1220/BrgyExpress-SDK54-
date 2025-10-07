@@ -399,6 +399,8 @@ app.get('/uploads/:id', async (req, res, next) => {
         const result = await pool.query('SELECT filename, mime_type, content FROM file_uploads WHERE id = $1', [id]);
         if (result.rows.length === 0) return next(); // fall through to static or 404
         const row = result.rows[0];
+        // Allow cross-origin embedding of images in admin panel
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         if (row.mime_type) res.setHeader('Content-Type', row.mime_type);
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         const dispositionName = row.filename || `${id}`;
@@ -409,6 +411,8 @@ app.get('/uploads/:id', async (req, res, next) => {
     }
 });
 
+// Ensure static uploads also allow cross-origin embedding
+app.use('/uploads', (req, res, next) => { res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'); next(); });
 app.use('/uploads', express.static(path.join(__dirname, "public/uploads")));
 app.use(generalLimiter);
 
