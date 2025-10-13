@@ -510,6 +510,41 @@ async function analyzeRemoteUrlWithModel(imageUrl) {
     }
 }
 
+// Analyze a raw image Buffer directly with the model API
+async function analyzeBufferWithModel(buffer, filenameHint = 'image.jpg', contentType = 'image/jpeg') {
+    try {
+        if (!buffer || !Buffer.isBuffer(buffer)) return null;
+        let buf = buffer;
+        if (buf.length > 4 * 1024 * 1024) {
+            try {
+                const meta = await sharp(buf).metadata();
+                const w = meta.width || 2000;
+                const maxW = 1600;
+                const resized = await sharp(buf)
+                    .resize({ width: Math.min(w, maxW) })
+                    .jpeg({ quality: 85 })
+                    .toBuffer();
+                buf = resized;
+            } catch (e) {
+                console.log('[bill-analysis] downscale buffer skipped:', e?.message || e);
+            }
+        }
+        const form = new FormData();
+        form.append('file', buf, { filename: filenameHint, contentType });
+        const url = MODEL_API_BASE.replace(/\/$/, '') + '/predict';
+        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 60000, maxBodyLength: Infinity, maxContentLength: Infinity, validateStatus: () => true });
+        const a = resp.data || {};
+        const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
+        const label = a.pred_label || a.label || null;
+        const threshold = a.threshold_used || a.threshold || null;
+        if (prob === null) return null;
+        return { prob, label, threshold };
+    } catch (e) {
+        console.warn('Model analyze buffer error:', e?.response?.status || e?.message || e);
+        return null;
+    }
+}
+
 // Simple image upload endpoint for mobile to use before creating requests
 app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     try {
@@ -534,6 +569,44 @@ app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
 });
 
 // (Model API endpoints removed)
+
+// Lightweight test endpoint to quickly hit the model without creating an ID request
+// Supports either: multipart file upload under field name "image" OR JSON body { imageUrl }
+app.post('/api/model/test', memUpload.single('image'), async (req, res) => {
+    try {
+        const imageUrl = (req.body && req.body.imageUrl) ? String(req.body.imageUrl).trim() : null;
+        let analysis = null;
+
+        if (req.file && req.file.buffer) {
+            analysis = await analyzeBufferWithModel(req.file.buffer, req.file.originalname || 'image.jpg', req.file.mimetype || 'image/jpeg');
+        } else if (imageUrl) {
+            if (/^https?:\/\//i.test(imageUrl)) {
+                analysis = await analyzeRemoteUrlWithModel(imageUrl);
+            } else {
+                const rel = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                const localPath = path.join(__dirname, 'public', rel);
+                analysis = await analyzeLocalFileWithModel(localPath);
+            }
+        } else {
+            return res.status(400).json({ success: false, message: 'Provide a file under field "image" or a JSON body { imageUrl }' });
+        }
+
+        if (!analysis) {
+            return res.status(502).json({ success: false, message: 'Model did not return a valid result' });
+        }
+
+        const isTampered = analysis.label ? (analysis.label.toLowerCase().includes('tampered')) : (analysis.prob >= 0.5);
+        return res.status(200).json({
+            success: true,
+            pred_label: isTampered ? 'tampered' : 'original',
+            prob_tampered: analysis.prob,
+            threshold_used: analysis.threshold ?? null
+        });
+    } catch (e) {
+        console.error('❌ /api/model/test error:', e?.message || e);
+        return res.status(500).json({ success: false, message: 'Unexpected error' });
+    }
+});
 
 // ========== ADMIN AUTHENTICATION ENDPOINTS ========== //
 console.log('🔐 Setting up admin authentication endpoints...');

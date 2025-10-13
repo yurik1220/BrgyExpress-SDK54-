@@ -1,34 +1,18 @@
 import os, io, hashlib
-import numpy as np
-from PIL import Image, ImageChops, ImageEnhance
+from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import torch
 import torch.nn as nn
 from torchvision import transforms, models
-from pydantic import BaseModel
 
 # Config
 MODEL_PATH = os.getenv("MODEL_PATH", "image_forgery_finetuned_v2.pth")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 THRESHOLD = float(os.getenv("THRESHOLD", "0.5"))
 
-# ELA (in-memory)
-def convert_to_ela_image_bytes(img: Image.Image, quality: int = 90) -> Image.Image:
-    buf = io.BytesIO()
-    img.convert("RGB").save(buf, format="JPEG", quality=quality)
-    buf.seek(0)
-    resaved = Image.open(buf)
-    ela_im = ImageChops.difference(img.convert("RGB"), resaved)
-    extrema = ela_im.getextrema()
-    max_diff = max([ex[1] for ex in extrema]) or 1
-    ela_im = ImageEnhance.Brightness(ela_im).enhance(255.0 / max_diff)
-    resaved.close()
-    buf.close()
-    return ela_im
-
-# Transforms (val-time)
+# Transforms (minimal)
 val_transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -76,11 +60,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class PredictResponse(BaseModel):
-    prob_tampered: float
-    pred_label: str
-    threshold_used: float
-
 @app.get("/")
 def root():
     return {"name": "image-forgery-api", "health": "/health", "predict": "/predict"}
@@ -89,7 +68,7 @@ def root():
 def health():
     return {"status": "ok", "device": str(DEVICE)}
 
-@app.post("/predict", response_model=PredictResponse)
+@app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     try:
         content = await file.read()
@@ -97,20 +76,14 @@ async def predict(file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid image file")
 
-    # ELA + transforms
-    ela_img = convert_to_ela_image_bytes(img, quality=90)
-    x = val_transform(ela_img).unsqueeze(0).to(DEVICE)
+    # Minimal transforms → tensor
+    x = val_transform(img).unsqueeze(0).to(DEVICE)
 
     # Inference
     with torch.no_grad():
         ensure_model_loaded()
         logit = model(x)
         prob = torch.sigmoid(logit).item()
-    pred = 1 if prob >= THRESHOLD else 0
-    label = "tampered" if pred == 1 else "original"
-
     return JSONResponse({
-        "prob_tampered": float(prob),
-        "pred_label": label,
-        "threshold_used": THRESHOLD
+        "prob_tampered": float(prob)
     })
