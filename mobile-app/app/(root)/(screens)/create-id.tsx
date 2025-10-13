@@ -75,8 +75,10 @@ const CreateIDScreen = () => {
   const [faceVerificationResult, setFaceVerificationResult] = useState<FaceVerificationResult | null>(null);
   const [idImage, setIdImage] = useState<string | null>(null);
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
+  const [billImage, setBillImage] = useState<string | null>(null);
   const [idImageUrl, setIdImageUrl] = useState<string | null>(null);
   const [selfieImageUrl, setSelfieImageUrl] = useState<string | null>(null);
+  const [billImageUrl, setBillImageUrl] = useState<string | null>(null);
   const [existingId, setExistingId] = useState<any | null>(null);
   const [devMode, setDevMode] = useState<DevOverrideMode>('auto');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -87,7 +89,7 @@ const CreateIDScreen = () => {
   const [addressError, setAddressError] = useState("");
   const [contactError, setContactError] = useState("");
 
-  const totalSteps = 4;
+  const totalSteps = 5;
   // Dev override loader
   useEffect(() => {
     const env = process.env.EXPO_PUBLIC_DEV_ID_MODE as DevOverrideMode | undefined;
@@ -257,7 +259,7 @@ const CreateIDScreen = () => {
       isValidAddressParts() &&
       isValidPhone(contactNumber);
     if (!fieldsValid) return false;
-    if (!idImage || !selfieImage) return false;
+    if (!idImage || !selfieImage || !billImage) return false;
     if (!faceVerificationResult) return false;
     return true;
   };
@@ -270,8 +272,8 @@ const CreateIDScreen = () => {
     const contactValid = validateContact(contactNumber);
     if (!nameValid || !dateValid || !addressValid || !contactValid) return;
 
-    if (!idImage || !selfieImage) {
-      Alert.alert("Requirements Missing", "Please upload your ID and take a selfie.");
+    if (!idImage || !selfieImage || !billImage) {
+      Alert.alert("Requirements Missing", "Please upload your ID, take a selfie, and add your Meralco bill.");
       return;
     }
     if (!faceVerificationResult) {
@@ -305,12 +307,16 @@ const CreateIDScreen = () => {
       // Upload images first if we only have local URIs
       let idUrl = idImageUrl;
       let selfieUrl = selfieImageUrl;
+      let billUrl = billImageUrl;
       try {
         if (idImage && !idUrl) {
           idUrl = await uploadImageToServer(idImage);
         }
         if (selfieImage && !selfieUrl) {
           selfieUrl = await uploadImageToServer(selfieImage);
+        }
+        if (billImage && !billUrl) {
+          billUrl = await uploadImageToServer(billImage);
         }
       } catch (e) {
         Alert.alert('Upload Failed', 'Could not upload images. Please try again.');
@@ -322,10 +328,12 @@ const CreateIDScreen = () => {
         ...requestData,
         id_image_url: idUrl || undefined,
         selfie_image_url: selfieUrl || undefined,
+        bill_image_url: billUrl || undefined,
       });
       // sync latest URLs to state after success
       if (idUrl) setIdImageUrl(idUrl);
       if (selfieUrl) setSelfieImageUrl(selfieUrl);
+      if (billUrl) setBillImageUrl(billUrl);
       setLastSubmitted(Date.now());
       setShowConfirmation(false);
       router.replace({
@@ -502,8 +510,9 @@ const CreateIDScreen = () => {
     const steps = [
       { key: 1, label: 'Profile', icon: 'person' as const },
       { key: 2, label: 'Verify', icon: 'shield-checkmark' as const },
-      { key: 3, label: 'Review', icon: 'document-text' as const },
-      { key: 4, label: 'Done', icon: 'checkmark-done' as const },
+      { key: 3, label: 'Proof', icon: 'document-text' as const },
+      { key: 4, label: 'Review', icon: 'document-text' as const },
+      { key: 5, label: 'Done', icon: 'checkmark-done' as const },
     ];
     return (
       <View style={styles.stepperBar}>
@@ -1079,8 +1088,100 @@ const CreateIDScreen = () => {
           </View>
         );
       case 3:
-        return renderReviewStep();
+        // Proof of Residence (Meralco Bill)
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.glassHeader}>
+              <LinearGradient colors={["#0ea5e9", "#6366f1"]} style={styles.glassHeaderGradient}>
+                <View style={styles.headerRow}>
+                  <View style={styles.headerBadge}><Ionicons name="document-text" size={18} color="#fff" /></View>
+                  <Text style={styles.headerTitle}>Proof of Residence</Text>
+                </View>
+                <Text style={styles.headerSubtitle}>Upload your latest Meralco bill</Text>
+              </LinearGradient>
+            </View>
+
+            <View style={styles.formCard}>
+              <View style={styles.reviewHeaderRow}>
+                <Ionicons name="file-tray" size={20} color="#6366f1" />
+                <Text style={styles.cardTitle}>Meralco Bill</Text>
+              </View>
+
+              {billImage ? (
+                <>
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: billImage }} style={styles.imagePreview} />
+                  </View>
+                  <View style={styles.inlineActionRow}>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={async () => {
+                      const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4,3], quality: 0.9 });
+                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                    }}>
+                      <Ionicons name="camera" size={16} color="#6b7280" />
+                      <Text style={styles.secondaryButtonText}>Retake</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={async () => {
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as any, allowsEditing: true, aspect: [4,3], quality: 0.8 });
+                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                    }}>
+                      <Ionicons name="image" size={16} color="#6b7280" />
+                      <Text style={styles.secondaryButtonText}>Replace</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={() => setBillImage(null)}>
+                      <Ionicons name="trash" size={16} color="#ef4444" />
+                      <Text style={styles.secondaryButtonText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.requirementTips}>
+                    <Text style={styles.tipsTitle}>Tips</Text>
+                    <Text style={styles.tipText}>Ensure the address and name are clearly visible.</Text>
+                  </View>
+                </>
+              ) : (
+                <View>
+                  <View style={styles.actionCardsRow}>
+                    <TouchableOpacity style={styles.actionCard} onPress={async () => {
+                      const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4,3], quality: 0.9 });
+                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                    }}>
+                      <Ionicons name="scan" size={18} color="#374151" />
+                      <Text style={styles.actionCardText}>Scan Bill</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionCard} onPress={async () => {
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as any, allowsEditing: true, aspect: [4,3], quality: 0.8 });
+                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                    }}>
+                      <Ionicons name="image" size={18} color="#374151" />
+                      <Text style={styles.actionCardText}>Upload Photo</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.requirementTips}>
+                    <Text style={styles.tipsTitle}>Requirements</Text>
+                    <Text style={styles.tipText}>Use a recent bill with your name and current address.</Text>
+                  </View>
+                </View>
+              )}
+
+              <View style={styles.inlineActionRowRight}>
+                <TouchableOpacity onPress={handleBack} style={styles.secondaryButton}>
+                  <Ionicons name="arrow-back" size={16} color="#6b7280" />
+                  <Text style={styles.secondaryButtonText}>Back</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleNext}
+                  style={[styles.footerPrimary, (!billImage) && styles.footerPrimaryDisabled]}
+                  disabled={!billImage}
+                >
+                  <Ionicons name="arrow-forward" size={18} color="#fff" />
+                  <Text style={styles.footerPrimaryText}>Continue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        );
       case 4:
+        return renderReviewStep();
+      case 5:
         return renderSuccessStep();
       default:
         return renderPersonalInfoStep();

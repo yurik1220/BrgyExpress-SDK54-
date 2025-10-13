@@ -37,6 +37,8 @@ const crypto = require('crypto');
 // { Pool } pulls the Pool export from the pg module using object destructuring
 const { Pool } = require("pg");
 const { Expo } = require('expo-server-sdk');
+const axios = require('axios');
+const FormData = require('form-data');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
@@ -45,8 +47,7 @@ const QRCode = require('qrcode');
 const { body, validationResult } = require('express-validator');
 // Load environment variables from .env into process.env
 require("dotenv").config();
-const fetch = require('node-fetch');
-const FormData = require('form-data');
+// (Model API integrations removed)
 
 // Initialize the Express application and global utilities
 // Create our Express app instance; this is the main server object
@@ -425,6 +426,62 @@ app.use(generalLimiter);
 
 console.log('🔧 Middleware configured: CORS, JSON parsing, static files, rate limiting');
 
+// Image Forgery Model API base (default to provided endpoint, can be overridden)
+const MODEL_API_BASE = (process.env.MODEL_API_URL && process.env.MODEL_API_URL.trim()) || 'https://image-forgery-api-3kdo.onrender.com';
+
+async function analyzeLocalFileWithModel(localPath) {
+    try {
+        if (!localPath || !fs.existsSync(localPath)) return null;
+        console.log('[bill-analysis] analyzeLocalFileWithModel path=', localPath);
+        const form = new FormData();
+        form.append('file', fs.createReadStream(localPath), {
+            filename: path.basename(localPath),
+            contentType: 'image/jpeg'
+        });
+        const url = MODEL_API_BASE.replace(/\/$/, '') + '/predict';
+        console.log('[bill-analysis] POST', url);
+        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 20000, validateStatus: () => true });
+        console.log('[bill-analysis] model status=', resp.status);
+        const a = resp.data || {};
+        const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
+        const label = a.pred_label || a.label || null;
+        const threshold = a.threshold_used || a.threshold || null;
+        if (prob === null) return null;
+        return { prob, label, threshold };
+    } catch (e) {
+        console.warn('Model analyze error:', e?.response?.status || e?.message || e);
+        return null;
+    }
+}
+
+async function analyzeRemoteUrlWithModel(imageUrl) {
+    try {
+        if (!imageUrl) return null;
+        console.log('[bill-analysis] analyzeRemoteUrlWithModel url=', imageUrl);
+        const form = new FormData();
+        // Many model servers accept either file or url; this one expects file.
+        // Fetch remote into buffer then send as file.
+        const r = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 20000, validateStatus: () => true });
+        console.log('[bill-analysis] fetch bill status=', r.status, 'content-type=', r.headers['content-type']);
+        if (r.status < 200 || r.status >= 300) return null;
+        const buf = Buffer.from(r.data);
+        form.append('file', buf, { filename: 'image.jpg', contentType: r.headers['content-type'] || 'image/jpeg' });
+        const url = MODEL_API_BASE.replace(/\/$/, '') + '/predict';
+        console.log('[bill-analysis] POST', url);
+        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 20000, validateStatus: () => true });
+        console.log('[bill-analysis] model status=', resp.status);
+        const a = resp.data || {};
+        const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
+        const label = a.pred_label || a.label || null;
+        const threshold = a.threshold_used || a.threshold || null;
+        if (prob === null) return null;
+        return { prob, label, threshold };
+    } catch (e) {
+        console.warn('Model analyze remote error:', e?.response?.status || e?.message || e);
+        return null;
+    }
+}
+
 // Simple image upload endpoint for mobile to use before creating requests
 app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     try {
@@ -448,74 +505,7 @@ app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     }
 });
 
-// Proxy: analyze image forgery via external FastAPI model
-// Expects multipart field name 'file' on the model, so we forward the uploaded file buffer
-app.post('/api/analyze-image', memUpload.single('image'), async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'No image uploaded' });
-        }
-
-        const modelApiBase = process.env.MODEL_API_URL;
-        if (!modelApiBase) {
-            return res.status(500).json({ success: false, message: 'MODEL_API_URL is not configured' });
-        }
-
-        const form = new FormData();
-        form.append('file', req.file.buffer, {
-            filename: req.file.originalname || 'image.jpg',
-            contentType: req.file.mimetype || 'image/jpeg'
-        });
-
-        const response = await fetch(`${modelApiBase.replace(/\/$/, '')}/predict`, {
-            method: 'POST',
-            body: form,
-            headers: form.getHeaders()
-        });
-
-        const text = await response.text();
-        let data;
-        try { data = JSON.parse(text); } catch { data = { raw: text }; }
-
-        if (!response.ok) {
-            return res.status(response.status).json({ success: false, message: 'Model API error', detail: data });
-        }
-
-        return res.status(200).json({ success: true, analysis: data });
-    } catch (error) {
-        console.error('❌ Analyze image proxy error:', error);
-        return res.status(500).json({ success: false, message: 'Failed to analyze image' });
-    }
-});
-
-// Helper to analyze a local file path with external model API
-async function analyzeLocalFileWithModel(localPath) {
-    try {
-        const modelApiBase = process.env.MODEL_API_URL;
-        if (!modelApiBase) return null;
-        if (!fs.existsSync(localPath)) return null;
-        const buf = fs.readFileSync(localPath);
-        const form = new FormData();
-        form.append('image', buf, {
-            filename: path.basename(localPath),
-            contentType: 'image/jpeg'
-        });
-        const response = await fetch(`${modelApiBase.replace(/\/$/, '')}/predict`, {
-            method: 'POST',
-            body: form,
-            headers: form.getHeaders()
-        });
-        const data = await response.json();
-        if (!response.ok) return null;
-        const a = data || {};
-        const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
-        const label = a.pred_label || a.label || null;
-        const threshold = a.threshold_used || a.threshold || null;
-        return { prob, label, threshold };
-    } catch {
-        return null;
-    }
-}
+// (Model API endpoints removed)
 
 // ========== ADMIN AUTHENTICATION ENDPOINTS ========== //
 console.log('🔐 Setting up admin authentication endpoints...');
@@ -1821,6 +1811,7 @@ app.post("/api/requests", upload.fields([
                 return res.status(200).json(docResult.rows[0]);
 
             case "Create ID":
+                console.log('[id-request] Create ID received for', clerk_id, 'at', timestamp);
                 if (!full_name || !birth_date || !address || !contact || !clerk_id) {
                     return res.status(400).json({ error: "Missing fields for Create ID" });
                 }
@@ -1829,6 +1820,7 @@ app.post("/api/requests", upload.fields([
                 const selfieImageUrl = selfieImageFile ? `/uploads/${selfieImageFile.filename}` : (req.body.selfie_image_url || null);
                 const billImageFile = files.bill_image && files.bill_image[0] ? files.bill_image[0] : null;
                 const billImageUrl = billImageFile ? `/uploads/${billImageFile.filename}` : (req.body.bill_image_url || null);
+                console.log('[id-request] billImageFile?', !!billImageFile, 'billImageUrl=', billImageUrl);
 
                 // Enforce presence of both images; block submission if either is missing
                 if (!idImageUrl || !selfieImageUrl) {
@@ -1858,22 +1850,34 @@ app.post("/api/requests", upload.fields([
                     );
                 }
 
-                // Optionally analyze Meralco bill image via model API (best-effort, do not fail request)
-                (async () => {
-                    try {
-                        if (billImageFile && process.env.MODEL_API_URL) {
-                            const result = await analyzeLocalFileWithModel(path.join(__dirname, 'public', 'uploads', billImageFile.filename));
-                            if (result) {
-                                await pool.query(
-                                    "UPDATE id_requests SET bill_prob_tampered = $1, bill_pred_label = $2, bill_threshold_used = $3 WHERE id = $4",
-                                    [result.prob, result.label, result.threshold, inserted.id]
-                                );
-                            }
+                // Analyze Meralco bill image via model API (best-effort, do not fail request)
+                try {
+                    let analysis = null;
+                    if (billImageFile) {
+                        const localPath = path.join(__dirname, 'public', 'uploads', billImageFile.filename);
+                        analysis = await analyzeLocalFileWithModel(localPath);
+                    } else if (billImageUrl) {
+                        // If absolute URL → fetch remotely; if local /uploads path → read from disk
+                        if (typeof billImageUrl === 'string' && /^https?:\/\//i.test(billImageUrl)) {
+                            analysis = await analyzeRemoteUrlWithModel(billImageUrl);
+                        } else {
+                            const rel = typeof billImageUrl === 'string' && billImageUrl.startsWith('/') ? billImageUrl : `/${billImageUrl}`;
+                            const localPath = path.join(__dirname, 'public', rel);
+                            analysis = await analyzeLocalFileWithModel(localPath);
                         }
-                    } catch (e) {
-                        console.warn('Bill analysis failed:', e?.message || e);
                     }
-                })();
+                    if (analysis) {
+                        console.log('[bill-analysis] result prob=', analysis.prob, 'threshold=', analysis.threshold);
+                        await pool.query(
+                            "UPDATE id_requests SET bill_prob_tampered = $1, bill_pred_label = $2, bill_threshold_used = $3 WHERE id = $4",
+                            [analysis.prob, analysis.label, analysis.threshold, inserted.id]
+                        );
+                    } else {
+                        console.log('[bill-analysis] no analysis result');
+                    }
+                } catch (e) {
+                    console.warn('Bill analysis failed:', e?.message || e);
+                }
 
                 const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [inserted.id]);
                 return res.status(200).json(updated.rows[0]);

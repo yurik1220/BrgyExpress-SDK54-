@@ -37,34 +37,7 @@ const IdRequests = () => {
     };
 
     // Fetch model analysis for a given image URL by proxying through backend
-    const analyzeImageUrl = async (url) => {
-        try {
-            if (!url) return null;
-            // Fetch the image as a blob (must be same-origin or CORS-enabled)
-            const imgResp = await fetch(toAbsoluteUrl(url), { credentials: 'include' });
-            if (!imgResp.ok) throw new Error('image fetch failed');
-            const blob = await imgResp.blob();
-            const form = new FormData();
-            form.append('image', blob, 'image.jpg');
-            const resp = await fetch(`${API_BASE}/api/analyze-image`, {
-                method: 'POST',
-                body: form,
-                credentials: 'include'
-            });
-            const data = await resp.json();
-            if (!resp.ok || data.success === false) throw new Error('model error');
-            const a = data.analysis || {};
-            // prefer prob_tampered; if absent, look for common keys
-            const prob = typeof a.prob_tampered === 'number'
-                ? a.prob_tampered
-                : (typeof a.prob === 'number' ? a.prob : null);
-            const label = a.pred_label || a.label || null;
-            const threshold = a.threshold_used || a.threshold || null;
-            return { prob, label, threshold };
-        } catch (e) {
-            return { error: true };
-        }
-    };
+    // Deprecated remote analysis; prefer stored DB value from selectedRequest
 
     // Run analysis when opening the modal (selectedRequest changes)
     useEffect(() => {
@@ -72,20 +45,14 @@ const IdRequests = () => {
             if (!showModal || !selectedRequest) return;
             setAnalysisLoading(true);
             setAnalysisError(null);
-            setAnalysis({ id: null, selfie: null });
-            const idVal = pickFirst(selectedRequest, [
-                'id_image_url', 'id_image', 'idImageUrl', 'idImagePath', 'idImage'
-            ]);
-            const selfieVal = pickFirst(selectedRequest, [
-                'selfie_image_url', 'selfie_image', 'selfieImageUrl', 'selfieImagePath', 'selfieImage'
-            ]);
-            const [idRes, selfieRes] = await Promise.all([
-                analyzeImageUrl(idVal),
-                analyzeImageUrl(selfieVal)
-            ]);
-            setAnalysis({ id: idRes, selfie: selfieRes });
-            if ((idRes && idRes.error) && (selfieRes && selfieRes.error)) {
-                setAnalysisError('Failed to analyze images');
+            setAnalysis({ id: null, selfie: null, bill: null });
+            const prob = typeof selectedRequest.bill_prob_tampered === 'number'
+                ? selectedRequest.bill_prob_tampered
+                : null;
+            const threshold = typeof selectedRequest.bill_threshold_used === 'number' ? selectedRequest.bill_threshold_used : 0.5;
+            setAnalysis({ id: null, selfie: null, bill: prob !== null ? { prob, threshold } : null });
+            if (prob === null) {
+                setAnalysisError('');
             }
             setAnalysisLoading(false);
         };
@@ -513,9 +480,9 @@ const IdRequests = () => {
                                                             </span>
                                                         </div>
                                                     )}
-                                                    {analysisError && (
-                                                        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
-                                                    )}
+                                                    {!analysis?.bill || analysis?.bill?.error ? (
+                                                        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>Failed to analyze bill</div>
+                                                    ) : null}
                                                 </>
                                             ) : (
                                                 <div style={{ fontSize: 13, color: '#6b7280' }}>No Meralco bill image available</div>
