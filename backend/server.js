@@ -433,14 +433,28 @@ async function analyzeLocalFileWithModel(localPath) {
     try {
         if (!localPath || !fs.existsSync(localPath)) return null;
         console.log('[bill-analysis] analyzeLocalFileWithModel path=', localPath);
+        let fileBuf = fs.readFileSync(localPath);
+        // Downscale/compress very large images to avoid timeouts
+        if (fileBuf.length > 4 * 1024 * 1024) {
+            try {
+                const meta = await sharp(fileBuf).metadata();
+                const w = meta.width || 2000;
+                const maxW = 1600;
+                const resized = await sharp(fileBuf)
+                    .resize({ width: Math.min(w, maxW) })
+                    .jpeg({ quality: 85 })
+                    .toBuffer();
+                console.log('[bill-analysis] downscaled local image from', fileBuf.length, 'to', resized.length);
+                fileBuf = resized;
+            } catch (e) {
+                console.log('[bill-analysis] downscale skipped:', e?.message || e);
+            }
+        }
         const form = new FormData();
-        form.append('file', fs.createReadStream(localPath), {
-            filename: path.basename(localPath),
-            contentType: 'image/jpeg'
-        });
+        form.append('file', fileBuf, { filename: path.basename(localPath), contentType: 'image/jpeg' });
         const url = MODEL_API_BASE.replace(/\/$/, '') + '/predict';
         console.log('[bill-analysis] POST', url);
-        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 20000, validateStatus: () => true });
+        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 60000, maxBodyLength: Infinity, maxContentLength: Infinity, validateStatus: () => true });
         console.log('[bill-analysis] model status=', resp.status);
         const a = resp.data || {};
         const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
@@ -458,17 +472,31 @@ async function analyzeRemoteUrlWithModel(imageUrl) {
     try {
         if (!imageUrl) return null;
         console.log('[bill-analysis] analyzeRemoteUrlWithModel url=', imageUrl);
-        const form = new FormData();
-        // Many model servers accept either file or url; this one expects file.
         // Fetch remote into buffer then send as file.
         const r = await axios.get(imageUrl, { responseType: 'arraybuffer', timeout: 20000, validateStatus: () => true });
         console.log('[bill-analysis] fetch bill status=', r.status, 'content-type=', r.headers['content-type']);
         if (r.status < 200 || r.status >= 300) return null;
-        const buf = Buffer.from(r.data);
+        let buf = Buffer.from(r.data);
+        if (buf.length > 4 * 1024 * 1024) {
+            try {
+                const meta = await sharp(buf).metadata();
+                const w = meta.width || 2000;
+                const maxW = 1600;
+                const resized = await sharp(buf)
+                    .resize({ width: Math.min(w, maxW) })
+                    .jpeg({ quality: 85 })
+                    .toBuffer();
+                console.log('[bill-analysis] downscaled remote image from', buf.length, 'to', resized.length);
+                buf = resized;
+            } catch (e) {
+                console.log('[bill-analysis] downscale remote skipped:', e?.message || e);
+            }
+        }
+        const form = new FormData();
         form.append('file', buf, { filename: 'image.jpg', contentType: r.headers['content-type'] || 'image/jpeg' });
         const url = MODEL_API_BASE.replace(/\/$/, '') + '/predict';
         console.log('[bill-analysis] POST', url);
-        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 20000, validateStatus: () => true });
+        const resp = await axios.post(url, form, { headers: form.getHeaders(), timeout: 60000, maxBodyLength: Infinity, maxContentLength: Infinity, validateStatus: () => true });
         console.log('[bill-analysis] model status=', resp.status);
         const a = resp.data || {};
         const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
