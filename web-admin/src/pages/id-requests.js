@@ -14,6 +14,9 @@ const IdRequests = () => {
     const [actionNote, setActionNote] = useState("");
     const [filterStatus, setFilterStatus] = useState("all");
     const [searchRef, setSearchRef] = useState("");
+    const [analysis, setAnalysis] = useState({ id: null, selfie: null });
+    const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [analysisError, setAnalysisError] = useState(null);
 
     // Utility: build absolute image URL from possible fields
     const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || "http://localhost:5000";
@@ -32,6 +35,63 @@ const IdRequests = () => {
         }
         return null;
     };
+
+    // Fetch model analysis for a given image URL by proxying through backend
+    const analyzeImageUrl = async (url) => {
+        try {
+            if (!url) return null;
+            // Fetch the image as a blob (must be same-origin or CORS-enabled)
+            const imgResp = await fetch(toAbsoluteUrl(url), { credentials: 'include' });
+            if (!imgResp.ok) throw new Error('image fetch failed');
+            const blob = await imgResp.blob();
+            const form = new FormData();
+            form.append('image', blob, 'image.jpg');
+            const resp = await fetch(`${API_BASE}/api/analyze-image`, {
+                method: 'POST',
+                body: form,
+                credentials: 'include'
+            });
+            const data = await resp.json();
+            if (!resp.ok || data.success === false) throw new Error('model error');
+            const a = data.analysis || {};
+            // prefer prob_tampered; if absent, look for common keys
+            const prob = typeof a.prob_tampered === 'number'
+                ? a.prob_tampered
+                : (typeof a.prob === 'number' ? a.prob : null);
+            const label = a.pred_label || a.label || null;
+            const threshold = a.threshold_used || a.threshold || null;
+            return { prob, label, threshold };
+        } catch (e) {
+            return { error: true };
+        }
+    };
+
+    // Run analysis when opening the modal (selectedRequest changes)
+    useEffect(() => {
+        const run = async () => {
+            if (!showModal || !selectedRequest) return;
+            setAnalysisLoading(true);
+            setAnalysisError(null);
+            setAnalysis({ id: null, selfie: null });
+            const idVal = pickFirst(selectedRequest, [
+                'id_image_url', 'id_image', 'idImageUrl', 'idImagePath', 'idImage'
+            ]);
+            const selfieVal = pickFirst(selectedRequest, [
+                'selfie_image_url', 'selfie_image', 'selfieImageUrl', 'selfieImagePath', 'selfieImage'
+            ]);
+            const [idRes, selfieRes] = await Promise.all([
+                analyzeImageUrl(idVal),
+                analyzeImageUrl(selfieVal)
+            ]);
+            setAnalysis({ id: idRes, selfie: selfieRes });
+            if ((idRes && idRes.error) && (selfieRes && selfieRes.error)) {
+                setAnalysisError('Failed to analyze images');
+            }
+            setAnalysisLoading(false);
+        };
+        run();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showModal, selectedRequest]);
 
     useEffect(() => {
         fetchRequests();
@@ -364,6 +424,7 @@ const IdRequests = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                             <i className="fas fa-id-card" style={{ color: '#6366f1' }}></i>
                                             <span style={{ fontWeight: 600 }}>Government ID</span>
+                                            {analysisLoading && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>Analyzing…</span>}
                                         </div>
                                         {(() => {
                                             const idVal = pickFirst(selectedRequest, [
@@ -371,7 +432,23 @@ const IdRequests = () => {
                                             ]);
                                             const src = toAbsoluteUrl(idVal);
                                             return src ? (
-                                                <img src={src} alt="Government ID" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                                <>
+                                                    <img src={src} alt="Government ID" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                                    {analysis?.id && !analysis?.id?.error && typeof analysis.id.prob === 'number' && (
+                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
+                                                            <span style={{ color: '#374151' }}>Tamper probability:</span>{' '}
+                                                            <span style={{ fontWeight: 700, color: analysis.id.prob >= (analysis.id.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
+                                                                {(analysis.id.prob * 100).toFixed(1)}%
+                                                            </span>
+                                                            {analysis.id.label && (
+                                                                <span style={{ marginLeft: 6, color: '#6b7280' }}>({analysis.id.label})</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {analysisError && (
+                                                        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
+                                                    )}
+                                                </>
                                             ) : (
                                                 <div style={{ fontSize: 13, color: '#6b7280' }}>No ID image available</div>
                                             );
@@ -383,6 +460,7 @@ const IdRequests = () => {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                                             <i className="fas fa-camera" style={{ color: '#6366f1' }}></i>
                                             <span style={{ fontWeight: 600 }}>Live Selfie</span>
+                                            {analysisLoading && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>Analyzing…</span>}
                                         </div>
                                         {(() => {
                                             const selfieVal = pickFirst(selectedRequest, [
@@ -390,7 +468,23 @@ const IdRequests = () => {
                                             ]);
                                             const src = toAbsoluteUrl(selfieVal);
                                             return src ? (
-                                                <img src={src} alt="Live Selfie" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                                <>
+                                                    <img src={src} alt="Live Selfie" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                                    {analysis?.selfie && !analysis?.selfie?.error && typeof analysis.selfie.prob === 'number' && (
+                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
+                                                            <span style={{ color: '#374151' }}>Tamper probability:</span>{' '}
+                                                            <span style={{ fontWeight: 700, color: analysis.selfie.prob >= (analysis.selfie.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
+                                                                {(analysis.selfie.prob * 100).toFixed(1)}%
+                                                            </span>
+                                                            {analysis.selfie.label && (
+                                                                <span style={{ marginLeft: 6, color: '#6b7280' }}>({analysis.selfie.label})</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {analysisError && (
+                                                        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
+                                                    )}
+                                                </>
                                             ) : (
                                                 <div style={{ fontSize: 13, color: '#6b7280' }}>No selfie image available</div>
                                             );

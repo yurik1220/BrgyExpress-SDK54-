@@ -45,6 +45,7 @@ const QRCode = require('qrcode');
 const { body, validationResult } = require('express-validator');
 // Load environment variables from .env into process.env
 require("dotenv").config();
+const fetch = require('node-fetch');
 
 // Initialize the Express application and global utilities
 // Create our Express app instance; this is the main server object
@@ -438,6 +439,46 @@ app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     } catch (error) {
         console.error('❌ Image upload error:', error);
         return res.status(500).json({ success: false, message: 'Failed to upload image' });
+    }
+});
+
+// Proxy: analyze image forgery via external FastAPI model
+// Expects multipart field name 'file' on the model, so we forward the uploaded file buffer
+app.post('/api/analyze-image', memUpload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'No image uploaded' });
+        }
+
+        const modelApiBase = process.env.MODEL_API_URL;
+        if (!modelApiBase) {
+            return res.status(500).json({ success: false, message: 'MODEL_API_URL is not configured' });
+        }
+
+        const form = new (require('form-data'))();
+        form.append('file', req.file.buffer, {
+            filename: req.file.originalname || 'image.jpg',
+            contentType: req.file.mimetype || 'image/jpeg'
+        });
+
+        const response = await fetch(`${modelApiBase.replace(/\/$/, '')}/predict`, {
+            method: 'POST',
+            body: form,
+            headers: form.getHeaders()
+        });
+
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+        if (!response.ok) {
+            return res.status(response.status).json({ success: false, message: 'Model API error', detail: data });
+        }
+
+        return res.status(200).json({ success: true, analysis: data });
+    } catch (error) {
+        console.error('❌ Analyze image proxy error:', error);
+        return res.status(500).json({ success: false, message: 'Failed to analyze image' });
     }
 });
 
