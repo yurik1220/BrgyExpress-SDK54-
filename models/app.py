@@ -36,6 +36,13 @@ val_transform = transforms.Compose([
                          std =[0.229, 0.224, 0.225]),
 ])
 
+# Limit CPU thread usage for free-tier memory/CPU constraints
+try:
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
+
 # Build model (ResNet50 with dropout head)
 def build_model():
     m = models.resnet50(weights=None)
@@ -43,11 +50,18 @@ def build_model():
     m.fc = nn.Sequential(nn.Dropout(p=0.5), nn.Linear(in_features, 1))
     return m
 
-# Load model
-model = build_model().to(DEVICE)
-state = torch.load(MODEL_PATH, map_location=DEVICE)
-model.load_state_dict(state)
-model.eval()
+# Lazy-load model on first request to reduce boot memory
+model = None
+
+def ensure_model_loaded():
+    global model
+    if model is None:
+        m = build_model().to(DEVICE)
+        # Load only weights; allow partial load if needed
+        state = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True) if hasattr(torch, 'load') else torch.load(MODEL_PATH, map_location=DEVICE)
+        m.load_state_dict(state)
+        m.eval()
+        model = m
 
 app = FastAPI()
 
@@ -89,6 +103,7 @@ async def predict(file: UploadFile = File(...)):
 
     # Inference
     with torch.no_grad():
+        ensure_model_loaded()
         logit = model(x)
         prob = torch.sigmoid(logit).item()
     pred = 1 if prob >= THRESHOLD else 0

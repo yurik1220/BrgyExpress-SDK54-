@@ -46,6 +46,7 @@ const { body, validationResult } = require('express-validator');
 // Load environment variables from .env into process.env
 require("dotenv").config();
 const fetch = require('node-fetch');
+const FormData = require('form-data');
 
 // Initialize the Express application and global utilities
 // Create our Express app instance; this is the main server object
@@ -161,6 +162,11 @@ async function ensureSchema() {
             await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS birthdate_on_id DATE");
             await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS address_on_id TEXT");
             await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS reference_number TEXT");
+            // Meralco bill analysis fields
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS bill_image_url TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS bill_prob_tampered DOUBLE PRECISION");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS bill_pred_label TEXT");
+            await pool.query("ALTER TABLE id_requests ADD COLUMN IF NOT EXISTS bill_threshold_used DOUBLE PRECISION");
         } catch (e) {
             console.warn('ID request schema ensure failed or partially applied:', e?.message || e);
         }
@@ -455,7 +461,7 @@ app.post('/api/analyze-image', memUpload.single('image'), async (req, res) => {
             return res.status(500).json({ success: false, message: 'MODEL_API_URL is not configured' });
         }
 
-        const form = new (require('form-data'))();
+        const form = new FormData();
         form.append('file', req.file.buffer, {
             filename: req.file.originalname || 'image.jpg',
             contentType: req.file.mimetype || 'image/jpeg'
@@ -481,6 +487,35 @@ app.post('/api/analyze-image', memUpload.single('image'), async (req, res) => {
         return res.status(500).json({ success: false, message: 'Failed to analyze image' });
     }
 });
+
+// Helper to analyze a local file path with external model API
+async function analyzeLocalFileWithModel(localPath) {
+    try {
+        const modelApiBase = process.env.MODEL_API_URL;
+        if (!modelApiBase) return null;
+        if (!fs.existsSync(localPath)) return null;
+        const buf = fs.readFileSync(localPath);
+        const form = new FormData();
+        form.append('image', buf, {
+            filename: path.basename(localPath),
+            contentType: 'image/jpeg'
+        });
+        const response = await fetch(`${modelApiBase.replace(/\/$/, '')}/predict`, {
+            method: 'POST',
+            body: form,
+            headers: form.getHeaders()
+        });
+        const data = await response.json();
+        if (!response.ok) return null;
+        const a = data || {};
+        const prob = typeof a.prob_tampered === 'number' ? a.prob_tampered : (typeof a.prob === 'number' ? a.prob : null);
+        const label = a.pred_label || a.label || null;
+        const threshold = a.threshold_used || a.threshold || null;
+        return { prob, label, threshold };
+    } catch {
+        return null;
+    }
+}
 
 // ========== ADMIN AUTHENTICATION ENDPOINTS ========== //
 console.log('🔐 Setting up admin authentication endpoints...');
@@ -1758,6 +1793,7 @@ app.post("/api/requests", upload.fields([
     { name: 'media', maxCount: 1 },
     { name: 'id_image', maxCount: 1 },
     { name: 'selfie_image', maxCount: 1 },
+    { name: 'bill_image', maxCount: 1 }, // Meralco bill
 ]), async (req, res) => {
     const { type, document_type, reason, clerk_id, full_name, birth_date, address, contact, description, title, location, sex, civil_status } = req.body;
     const files = req.files || {};
@@ -1791,6 +1827,8 @@ app.post("/api/requests", upload.fields([
 
                 const idImageUrl = idImageFile ? `/uploads/${idImageFile.filename}` : (req.body.id_image_url || null);
                 const selfieImageUrl = selfieImageFile ? `/uploads/${selfieImageFile.filename}` : (req.body.selfie_image_url || null);
+                const billImageFile = files.bill_image && files.bill_image[0] ? files.bill_image[0] : null;
+                const billImageUrl = billImageFile ? `/uploads/${billImageFile.filename}` : (req.body.bill_image_url || null);
 
                 // Enforce presence of both images; block submission if either is missing
                 if (!idImageUrl || !selfieImageUrl) {
@@ -1815,15 +1853,30 @@ app.post("/api/requests", upload.fields([
                 // If columns exist, immediately set the image URLs
                 if (hasIdImageColumns) {
                     await pool.query(
-                        "UPDATE id_requests SET id_image_url = $1, selfie_image_url = $2 WHERE id = $3",
-                        [idImageUrl, selfieImageUrl, inserted.id]
+                        "UPDATE id_requests SET id_image_url = $1, selfie_image_url = $2, bill_image_url = $3 WHERE id = $4",
+                        [idImageUrl, selfieImageUrl, billImageUrl, inserted.id]
                     );
-                    const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [inserted.id]);
-                    return res.status(200).json(updated.rows[0]);
                 }
 
-                // Fallback: return inserted row without image columns (should not happen if schema ensured)
-                return res.status(200).json(inserted);
+                // Optionally analyze Meralco bill image via model API (best-effort, do not fail request)
+                (async () => {
+                    try {
+                        if (billImageFile && process.env.MODEL_API_URL) {
+                            const result = await analyzeLocalFileWithModel(path.join(__dirname, 'public', 'uploads', billImageFile.filename));
+                            if (result) {
+                                await pool.query(
+                                    "UPDATE id_requests SET bill_prob_tampered = $1, bill_pred_label = $2, bill_threshold_used = $3 WHERE id = $4",
+                                    [result.prob, result.label, result.threshold, inserted.id]
+                                );
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Bill analysis failed:', e?.message || e);
+                    }
+                })();
+
+                const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [inserted.id]);
+                return res.status(200).json(updated.rows[0]);
 
             case "Incident Report":
                 if (!title || !description || !location || !clerk_id) {

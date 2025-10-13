@@ -490,6 +490,38 @@ const IdRequests = () => {
                                             );
                                         })()}
                                     </div>
+                                    {/* Meralco Bill */}
+                                    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 10 }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                            <i className="fas fa-file-invoice-dollar" style={{ color: '#6366f1' }}></i>
+                                            <span style={{ fontWeight: 600 }}>Meralco Bill</span>
+                                            {analysisLoading && <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>Analyzing…</span>}
+                                        </div>
+                                        {(() => {
+                                            const billVal = pickFirst(selectedRequest, [
+                                                'bill_image_url', 'billImageUrl', 'bill_image'
+                                            ]);
+                                            const src = toAbsoluteUrl(billVal);
+                                            return src ? (
+                                                <>
+                                                    <img src={src} alt="Meralco Bill" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
+                                                    {analysis?.bill && !analysis?.bill?.error && typeof analysis.bill.prob === 'number' && (
+                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
+                                                            <span style={{ color: '#374151' }}>Confidence:</span>{' '}
+                                                            <span style={{ fontWeight: 700, color: analysis.bill.prob >= (analysis.bill.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
+                                                                {(analysis.bill.prob * 100).toFixed(0)}% {analysis.bill.prob >= (analysis.bill.threshold || 0.5) ? 'More likely Tampered' : 'More likely Original'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {analysisError && (
+                                                        <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
+                                                    )}
+                                                </>
+                                            ) : (
+                                                <div style={{ fontSize: 13, color: '#6b7280' }}>No Meralco bill image available</div>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -14,4 +14,10 @@ services:
         value: "0.5"
       - key: CORS_ALLOW_ORIGINS
         value: "*"
+      - key: UVICORN_WORKERS
+        value: "1"
+      - key: TORCH_NUM_THREADS
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
 
