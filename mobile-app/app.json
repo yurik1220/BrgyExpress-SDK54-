@@ -16,7 +16,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.yurik1220.brgyexpress",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "We use the camera for face verification (blink and head turn liveness)."
       }
     },
     "android": {
@@ -24,7 +25,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#999999"
       },
-      "package": "com.yurik1220.brgyexpress"
+      "package": "com.yurik1220.brgyexpress",
+      "permissions": ["CAMERA"]
     },
     "web": {
       "bundler": "metro",
@@ -45,7 +47,7 @@
             "usesCleartextTraffic": true,
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
-            "minSdkVersion": 24,
+            "minSdkVersion": 26,
             "kotlinVersion": "2.0.21",
             "buildToolsVersion": "35.0.0"
           }

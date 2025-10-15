@@ -317,44 +317,60 @@ export default function AnnouncementsList() {
                 {/* Header */}
                 <Animated.View 
                     entering={FadeInDown.duration(800).springify()}
-                    style={{ alignItems: 'center', marginTop: 16, marginBottom: 20 }}
+                    style={{ marginBottom: 16 }}
                 >
                     <LinearGradient
-                        colors={['#667eea', '#764ba2']}
+                        colors={[ 'rgba(59,130,246,0.92)', 'rgba(99,102,241,0.92)' ]}
                         style={{
-                            width: 60,
-                            height: 60,
-                            borderRadius: 30,
-                            justifyContent: 'center',
+                            borderBottomLeftRadius: 24,
+                            borderBottomRightRadius: 24,
+                            paddingTop: 28,
+                            paddingBottom: 20,
+                            paddingHorizontal: 20,
+                            marginHorizontal: -20,
                             alignItems: 'center',
-                            marginBottom: 12,
-                            shadowColor: '#667eea',
+                            justifyContent: 'center',
+                            shadowColor: '#3b82f6',
                             shadowOffset: { width: 0, height: 8 },
                             shadowOpacity: 0.2,
                             shadowRadius: 16,
                             elevation: 8,
                         }}
                     >
-                        <Ionicons name="megaphone" size={28} color="#ffffff" />
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 28,
+                                backgroundColor: 'rgba(255,255,255,0.15)',
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                marginRight: 10,
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,255,255,0.25)'
+                            }}>
+                                <Ionicons name="megaphone" size={28} color="#ffffff" />
+                            </View>
+                            <View>
+                                <Text style={{ 
+                                    fontSize: 26, 
+                                    fontWeight: '800', 
+                                    color: '#ffffff', 
+                                    letterSpacing: -0.5
+                                }}>
+                                    Announcements
+                                </Text>
+                                <Text style={{ 
+                                    fontSize: 14, 
+                                    color: 'rgba(255,255,255,0.9)',
+                                    lineHeight: 18,
+                                    fontWeight: '500'
+                                }}>
+                                    Stay updated with important news and updates
+                                </Text>
+                            </View>
+                        </View>
                     </LinearGradient>
-                    <Text style={{ 
-                        fontSize: 28, 
-                        fontWeight: '800', 
-                        color: '#1f2937', 
-                        marginBottom: 6,
-                        letterSpacing: -0.5
-                    }}>
-                        Announcements
-                    </Text>
-                    <Text style={{ 
-                        fontSize: 15, 
-                        color: '#6b7280',
-                        textAlign: 'center',
-                        lineHeight: 20,
-                        fontWeight: '400'
-                    }}>
-                        Stay updated with important news and updates
-                    </Text>
                 </Animated.View>
 
                 {/* Content */}

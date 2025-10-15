@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,18 +9,10 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { 
-  FadeIn, 
-  FadeOut, 
-  SlideInUp,
-  SlideOutDown,
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-} from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -37,60 +29,11 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
   title = "Face Verification",
   subtitle = "Position your face within the frame and take a clear photo"
 }) => {
-  const [cameraType, setCameraType] = useState<CameraType>('front');
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
-  
-  const cameraRef = useRef<CameraView>(null);
-  const scale = useSharedValue(1);
+  const cameraRef = useRef<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  // Request permission via button to avoid re-render loops
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: scale.value }],
-    };
-  });
-
-  const handleCapture = async () => {
-    if (!cameraRef.current || isCapturing) return;
-
-    setIsCapturing(true);
-    scale.value = withSpring(0.9, { duration: 100 }, () => {
-      scale.value = withSpring(1, { duration: 100 });
-    });
-
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.9,
-        exif: true,
-        skipProcessing: false,
-      });
-
-      if (photo) {
-        setCapturedImage(photo.uri);
-        setShowPreview(true);
-      }
-    } catch (error) {
-      console.error('Error capturing photo:', error);
-      Alert.alert('Error', 'Failed to capture photo. Please try again.');
-    } finally {
-      setIsCapturing(false);
-    }
-  };
-
-  const handleRetake = () => {
-    setCapturedImage(null);
-    setShowPreview(false);
-  };
-
-  const handleUsePhoto = () => {
-    if (capturedImage) {
-      onCapture(capturedImage);
-    }
-  };
+  // No liveness here; simple capture for Expo Go compatibility
 
   if (!permission) {
     return (
@@ -99,7 +42,6 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
       </View>
     );
   }
-
   if (!permission.granted) {
     return (
       <View style={styles.container}>
@@ -107,7 +49,7 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
           <Ionicons name="camera" size={64} color="#ef4444" />
           <Text style={styles.permissionTitle}>Camera Permission Required</Text>
           <Text style={styles.permissionText}>
-            This app needs camera access to verify your identity. Please enable camera permissions in your device settings.
+            This app needs camera access to take your selfie.
           </Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
             <Text style={styles.permissionButtonText}>Allow Camera</Text>
@@ -120,53 +62,15 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
     );
   }
 
-  if (showPreview && capturedImage) {
-    return (
-      <View style={styles.container}>
-        <Image source={{ uri: capturedImage }} style={styles.previewImage} />
-        
-        <Animated.View 
-          entering={SlideInUp.duration(300)}
-          style={styles.previewControls}
-        >
-          <LinearGradient
-            colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'transparent']}
-            style={styles.previewGradient}
-          >
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>Photo Preview</Text>
-              <Text style={styles.previewSubtitle}>Review your photo before proceeding</Text>
-            </View>
-            
-            <View style={styles.previewButtons}>
-              <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
-                <Ionicons name="refresh" size={20} color="#6b7280" />
-                <Text style={styles.retakeButtonText}>Retake</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.usePhotoButton} onPress={handleUsePhoto}>
-                <Ionicons name="checkmark" size={20} color="white" />
-                <Text style={styles.usePhotoButtonText}>Use Photo</Text>
-              </TouchableOpacity>
-            </View>
-          </LinearGradient>
-        </Animated.View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <CameraView
         ref={cameraRef}
         style={styles.camera}
-        facing={cameraType}
+        facing={'front'}
       >
         {/* Header */}
-        <Animated.View 
-          entering={FadeIn.duration(500)}
-          style={styles.header}
-        >
+        <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
           <LinearGradient
             colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'transparent']}
             style={styles.headerGradient}
@@ -174,7 +78,6 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
-            
             <View style={styles.headerContent}>
               <Text style={styles.headerTitle}>{title}</Text>
               <Text style={styles.headerSubtitle}>{subtitle}</Text>
@@ -182,56 +85,50 @@ const FaceVerificationCamera: React.FC<FaceVerificationCameraProps> = ({
           </LinearGradient>
         </Animated.View>
 
-        {/* Face Detection Overlay */}
-        <View style={styles.faceOverlay}>
-          <View style={styles.faceFrame}>
-            <View style={styles.corner} />
-            <View style={[styles.corner, styles.cornerTopRight]} />
-            <View style={[styles.corner, styles.cornerBottomLeft]} />
-            <View style={[styles.corner, styles.cornerBottomRight]} />
-          </View>
-          <Text style={styles.faceInstruction}>Position your face here</Text>
-        </View>
-
-        {/* Camera Controls */}
-        <Animated.View 
-          entering={SlideInUp.duration(500)}
-          style={styles.controls}
-        >
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.8)']}
-            style={styles.controlsGradient}
-          >
-            <View style={styles.controlsContent}>
-              <View style={styles.controlButtons}>
-                <TouchableOpacity style={styles.controlButton}>
-                  <Ionicons name="settings" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
-              
-              <Animated.View style={[styles.captureButton, animatedStyle]}>
-                <TouchableOpacity
-                  style={styles.captureButtonInner}
-                  onPress={handleCapture}
-                  disabled={isCapturing}
-                >
-                  {isCapturing ? (
-                    <ActivityIndicator color="white" size="large" />
-                  ) : (
-                    <View style={styles.captureButtonIcon} />
-                  )}
-                </TouchableOpacity>
-              </Animated.View>
-              
-              <View style={styles.controlButtons}>
-                <TouchableOpacity style={styles.controlButton}>
-                  <Ionicons name="help-circle" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
+        {/* Bottom capture */}
+        <View style={styles.bottomOverlay}>
+          <LinearGradient colors={['transparent', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.8)']} style={styles.bottomGradient}>
+            <View style={{ alignItems: 'center' }}>
+              <TouchableOpacity
+                disabled={isCapturing}
+                onPress={async () => {
+                  try {
+                    setIsCapturing(true);
+                    const photo = await cameraRef.current?.takePictureAsync?.({ quality: 0.9, skipProcessing: false });
+                    const uri = photo?.uri as string | undefined;
+                    if (uri) onCapture(uri);
+                  } catch (e) {
+                    Alert.alert('Error', 'Failed to capture photo. Please try again.');
+                  } finally {
+                    setIsCapturing(false);
+                  }
+                }}
+                style={styles.captureButton}
+              >
+                {isCapturing ? <ActivityIndicator color="#fff" /> : <View style={styles.captureInner} />}
+              </TouchableOpacity>
             </View>
           </LinearGradient>
-        </Animated.View>
+        </View>
       </CameraView>
+
+      {/* Header with title and close */}
+      <Animated.View entering={FadeIn.duration(500)} style={styles.header}>
+        <LinearGradient
+          colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0.4)', 'transparent']}
+          style={styles.headerGradient}
+        >
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" size={24} color="white" />
+          </TouchableOpacity>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerTitle}>{title}</Text>
+            <Text style={styles.headerSubtitle}>{subtitle}</Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
+
+      {/* header rendered inside CameraView */}
     </View>
   );
 };
@@ -284,177 +181,77 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
   },
-  faceOverlay: {
+  debugOverlay: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
+    top: 110,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    padding: 8,
+    zIndex: 9,
   },
-  faceFrame: {
-    width: 250,
-    height: 300,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 20,
-    position: 'relative',
-  },
-  corner: {
-    position: 'absolute',
-    width: 30,
-    height: 30,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderColor: '#667eea',
-    top: -2,
-    left: -2,
-  },
-  cornerTopRight: {
-    top: -2,
-    right: -2,
-    left: 'auto',
-    borderLeftWidth: 0,
-    borderRightWidth: 3,
-  },
-  cornerBottomLeft: {
-    top: 'auto',
-    bottom: -2,
-    borderTopWidth: 0,
-    borderBottomWidth: 3,
-  },
-  cornerBottomRight: {
-    top: 'auto',
-    bottom: -2,
-    right: -2,
-    left: 'auto',
-    borderTopWidth: 0,
-    borderLeftWidth: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-  },
-  faceInstruction: {
+  debugLine: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 20,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    fontSize: 12,
+    lineHeight: 16,
   },
-  controls: {
+  bottomOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
   },
-  controlsGradient: {
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  controlsContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 40,
-  },
-  controlButtons: {
-    width: 60,
-    alignItems: 'center',
-  },
-  controlButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  bottomGradient: {
+    paddingBottom: 32,
+    paddingTop: 16,
   },
   captureButton: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.6)'
   },
-  captureButtonInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'white',
+  captureInner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ffffff',
+  },
+  statusRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
   },
-  captureButtonIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#667eea',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  previewControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  previewGradient: {
-    paddingBottom: 40,
-    paddingTop: 20,
-  },
-  previewHeader: {
+  statusPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
   },
-  previewTitle: {
-    color: 'white',
-    fontSize: 20,
+  statusPillPending: {
+    borderColor: '#94a3b8',
+    backgroundColor: 'rgba(0,0,0,0.25)',
+  },
+  statusPillOk: {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(16,185,129,0.15)',
+  },
+  statusText: {
+    color: '#e5e7eb',
+    fontSize: 13,
     fontWeight: '600',
   },
-  previewSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
-    marginTop: 4,
-  },
-  previewButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 40,
-  },
-  retakeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  retakeButtonText: {
-    color: '#6b7280',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  usePhotoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#667eea',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  usePhotoButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
+  statusTextOk: {
+    color: '#d1fae5',
   },
   permissionContainer: {
     flex: 1,

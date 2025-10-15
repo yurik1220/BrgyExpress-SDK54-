@@ -429,6 +429,41 @@ console.log('🔧 Middleware configured: CORS, JSON parsing, static files, rate 
 // Image Forgery Model API base (default to provided endpoint, can be overridden)
 const MODEL_API_BASE = (process.env.MODEL_API_URL && process.env.MODEL_API_URL.trim()) || 'https://image-forgery-api-3kdo.onrender.com';
 
+// Cloudinary config (optional). If provided, generated ID cards will be uploaded here.
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME || '';
+const CLOUDINARY_UPLOAD_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '';
+
+async function importLocalFileToUploads(localRelativePath) {
+    try {
+        if (!localRelativePath) return null;
+        const rel = localRelativePath.startsWith('/') ? localRelativePath : `/${localRelativePath}`;
+        const localPath = path.join(__dirname, 'public', rel);
+        if (!fs.existsSync(localPath)) return null;
+        const buf = fs.readFileSync(localPath);
+        const id = (crypto.randomUUID && crypto.randomUUID()) || (Date.now().toString(36) + '-' + Math.random().toString(16).slice(2));
+        const filename = path.basename(localPath);
+        const mimeType = filename.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+        await pool.query('INSERT INTO file_uploads (id, filename, mime_type, content) VALUES ($1, $2, $3, $4)', [id, filename, mimeType, buf]);
+        return `/uploads/${id}`;
+    } catch (e) {
+        console.warn('importLocalFileToUploads failed:', e?.message || e);
+        return null;
+    }
+}
+
+async function saveBufferToUploads(buf, filename, mimeType) {
+    try {
+        const id = (crypto.randomUUID && crypto.randomUUID()) || (Date.now().toString(36) + '-' + Math.random().toString(16).slice(2));
+        const fname = filename || `${id}.bin`;
+        const mime = mimeType || 'application/octet-stream';
+        await pool.query('INSERT INTO file_uploads (id, filename, mime_type, content) VALUES ($1, $2, $3, $4)', [id, fname, mime, buf]);
+        return `/uploads/${id}`;
+    } catch (e) {
+        console.warn('saveBufferToUploads failed:', e?.message || e);
+        return null;
+    }
+}
+
 async function analyzeLocalFileWithModel(localPath) {
     try {
         if (!localPath || !fs.existsSync(localPath)) return null;
@@ -565,6 +600,24 @@ app.post('/api/upload-image', memUpload.single('image'), async (req, res) => {
     } catch (error) {
         console.error('❌ Image upload error:', error);
         return res.status(500).json({ success: false, message: 'Failed to upload image' });
+    }
+});
+
+// Helper: import an existing local file under public/uploads/<path> into DB-backed /uploads/:id and return its absolute URL
+app.post('/api/import-local-upload', async (req, res) => {
+    try {
+        const { path: rel } = req.body || {};
+        if (!rel || typeof rel !== 'string') return res.status(400).json({ success: false, message: 'Provide body { path: "/uploads/id-cards/64.png" }' });
+        // Sanitize
+        if (!rel.startsWith('/uploads/')) return res.status(400).json({ success: false, message: 'Path must start with /uploads/' });
+        if (rel.includes('..')) return res.status(400).json({ success: false, message: 'Invalid path' });
+        const newRel = await importLocalFileToUploads(rel);
+        if (!newRel) return res.status(404).json({ success: false, message: 'Local file not found' });
+        const absoluteUrl = `${req.protocol}://${req.get('host')}${newRel}`;
+        return res.status(200).json({ success: true, url: absoluteUrl, path: newRel });
+    } catch (e) {
+        console.error('import-local-upload error:', e);
+        return res.status(500).json({ success: false, message: 'Failed to import local upload' });
     }
 });
 
@@ -2121,6 +2174,18 @@ app.post('/api/id-requests/:id/generate-id-card', async (req, res) => {
             civilStatus: row.civil_status || '',
         });
         if (!idCardUrl) return res.status(500).json({ error: 'Failed to generate ID card image' });
+        // If generated URL points to local static file path, import into DB-backed uploads
+        // e.g., /uploads/id-cards/64.png -> /uploads/<uuid>
+        if (typeof idCardUrl === 'string' && idCardUrl.startsWith('/uploads/')) {
+            // If it's already a DB-backed id, it won't exist under public; if it's a static file, import will work
+            const importedRel = await importLocalFileToUploads(idCardUrl);
+            if (importedRel) {
+                const absolute = `${req.protocol}://${req.get('host')}${importedRel}`;
+                await pool.query('UPDATE id_requests SET id_card_url = $1, id_card_generated_at = NOW() WHERE id = $2', [absolute, row.id]);
+                const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [row.id]);
+                return res.status(200).json(updated.rows[0]);
+            }
+        }
         await pool.query('UPDATE id_requests SET id_card_url = $1, id_card_generated_at = NOW() WHERE id = $2', [idCardUrl, row.id]);
         const updated = await pool.query('SELECT * FROM id_requests WHERE id = $1', [row.id]);
         return res.status(200).json(updated.rows[0]);
@@ -2421,10 +2486,10 @@ async function generateIdCardImage({ id, fullName, birthDate, address, reference
                 }
             } catch {}
             if (selfieBuf) {
-                // Auto-rotate using EXIF, resize to fit photo box, rectangular (no mask)
+                // Respect EXIF orientation and ensure upright crop for the ID photo window
                 selfieProcessed = await sharp(selfieBuf)
-                    .rotate(-90)
-                    .resize(300, 300, { fit: 'cover', position: 'centre' })
+                    .rotate() // auto based on EXIF
+                    .resize(300, 400, { fit: 'cover', position: 'centre' }) // portrait crop window
                     .png()
                     .toBuffer();
             }
@@ -2567,6 +2632,18 @@ async function generateIdCardImage({ id, fullName, birthDate, address, reference
             }
         }
 
+        // Persist the generated ID card in the same DB-backed uploads store used by /api/upload-image
+        try {
+            const fileBuf = fs.readFileSync(outPath);
+            const savedRel = await saveBufferToUploads(fileBuf, `${id}.png`, 'image/png');
+            if (savedRel) {
+                return savedRel; // return relative path; caller will make absolute
+            }
+        } catch (e) {
+            console.warn('Saving generated ID card to DB uploads failed:', e?.message || e);
+        }
+
+        // Final fallback to local static path (still accessible via static)
         return `/uploads/id-cards/${id}.png`;
     } catch (e) {
         console.error('generateIdCardImage error:', e);

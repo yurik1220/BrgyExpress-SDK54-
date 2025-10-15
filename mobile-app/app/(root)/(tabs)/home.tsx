@@ -21,6 +21,9 @@ const { width } = Dimensions.get("window");
 export default function Page() {
   const router = useRouter();
   const { isSignedIn, userId } = useAuth();
+  // Responsive logo dimensions (rough 3.3:1 aspect)
+  const logoW = Math.min(width * 0.42, 220);
+  const logoH = logoW / 3.3;
   const slideshowImages = [
     images.slideshow1,
     images.slideshow2,
@@ -43,12 +46,12 @@ export default function Page() {
     transform: [{ translateX: translateX.value }],
   }));
 
-  const onGestureEvent = (event) => {
+  const onGestureEvent = (event: any) => {
     const { translationX } = event.nativeEvent;
     translateX.value = translationX;
   };
 
-  const onGestureEnd = (event) => {
+  const onGestureEnd = (event: any) => {
     const { translationX, velocityX } = event.nativeEvent;
 
     if (translationX < -50 || velocityX < -500) {
@@ -69,8 +72,19 @@ export default function Page() {
         style={{ flex: 1 }}
       >
         {/* Header Section */}
-        <View style={{ padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Image source={images.logo} style={{ width: 120, height: 40, resizeMode: 'contain' }} />
+        <View style={{ padding: 20, flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ width: logoW, height: logoH }}>
+            <Image 
+              source={images.logo} 
+              style={{ 
+                width: '170%', 
+                height: '170%', 
+                resizeMode: 'contain', 
+                transform: [{ translateX: -90 }, { translateY: -6 }]
+              }} 
+            />
+          </View>
+          <View style={{ flex: 1 }} />
           <TouchableOpacity 
             onPress={() => router.push("/profile")}
             style={{ 
@@ -98,7 +112,7 @@ export default function Page() {
         </View>
 
         {/* Slideshow Container */}
-        <View style={{ height: 200, marginBottom: 20 }}>
+        <View style={{ height: 200, marginBottom: 5 }}>
           <PanGestureHandler
             onGestureEvent={onGestureEvent}
             onEnded={onGestureEnd}
@@ -130,7 +144,7 @@ export default function Page() {
 
         {/* Services Grid */}
         <View style={{ padding: 20 }}>
-          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0f172a', marginBottom: 16 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#0f172a', marginBottom: 8 }}>
             Available Services
           </Text>
           

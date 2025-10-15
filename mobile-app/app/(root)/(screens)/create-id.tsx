@@ -13,6 +13,8 @@ import {
   StyleSheet,
   Image,
   Modal,
+  Linking,
+  Share,
 } from "react-native";
 import { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,7 +26,8 @@ import { Ionicons } from '@expo/vector-icons';
 import ConfirmationModal from "@/components/ConfirmationModal";
 import * as ImagePicker from 'expo-image-picker';
 import FaceVerificationCamera from "@/components/FaceVerificationCamera";
-import faceppService, { FaceVerificationResult } from "@/lib/facepp";
+import luxand, { FaceVerificationResult, liveness as luxandLiveness, verifyFace as luxandVerify } from "@/lib/luxand";
+import { PH_GEOGRAPHY } from "@/constants/ph-geo";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
@@ -37,6 +40,10 @@ interface RequestData {
   contact: string;
   clerk_id: string | null;
   face_verification?: FaceVerificationResult;
+  // extra address breakdown for backend/reference
+  region?: string;
+  city?: string;
+  barangay?: string;
 }
 
 type DevOverrideMode = 'auto' | 'force_form' | 'force_view';
@@ -82,6 +89,19 @@ const CreateIDScreen = () => {
   const [existingId, setExistingId] = useState<any | null>(null);
   const [devMode, setDevMode] = useState<DevOverrideMode>('auto');
   const [isVerifying, setIsVerifying] = useState(false);
+  const [noticeVisible, setNoticeVisible] = useState(false);
+  const [noticeTitle, setNoticeTitle] = useState('');
+  const [noticeMessage, setNoticeMessage] = useState('');
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [successTitle, setSuccessTitle] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Cascading geo data imported from constants
+
+  // Picker visibility
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
+  const [showCityPicker, setShowCityPicker] = useState(false);
+  const [showBarangayPicker, setShowBarangayPicker] = useState(false);
 
   // Form validation states
   const [nameError, setNameError] = useState("");
@@ -89,7 +109,7 @@ const CreateIDScreen = () => {
   const [addressError, setAddressError] = useState("");
   const [contactError, setContactError] = useState("");
 
-  const totalSteps = 5;
+  const totalSteps = 4;
   // Dev override loader
   useEffect(() => {
     const env = process.env.EXPO_PUBLIC_DEV_ID_MODE as DevOverrideMode | undefined;
@@ -112,11 +132,21 @@ const CreateIDScreen = () => {
   const fetchLatestId = async () => {
     if (!userId) return;
     try {
-      const url = `${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}`;
-      const r = await axios.get(url);
+      const url = `${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`;
+      const r = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
       const items = (r.data || []).filter((x: any) => x.type === 'Create ID');
       if (!items.length) { setExistingId(null); return; }
-      const byDateDesc = (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const parseWhen = (row: any) => {
+        const candidates = [row.id_card_generated_at, row.updated_at, row.created_at];
+        for (const c of candidates) {
+          const t = c ? new Date(c as any).getTime() : NaN;
+          if (!isNaN(t)) return t;
+        }
+        // fallback: numeric id if available
+        if (typeof row.id === 'number') return row.id;
+        return 0;
+      };
+      const byDateDesc = (a: any, b: any) => parseWhen(b) - parseWhen(a);
       const latestApproved = items.filter((x: any) => x.status === 'approved').sort(byDateDesc)[0];
       const latestAny = items.sort(byDateDesc)[0];
       setExistingId(latestApproved || latestAny || null);
@@ -158,7 +188,7 @@ const CreateIDScreen = () => {
     addrStreet.trim().length > 2 &&
     addrBarangay.trim().length > 2 &&
     addrCity.trim().length > 2 &&
-    addrProvince.trim().length > 2 &&
+    addrRegion.trim().length > 2 &&
     isValidZip(addrZip);
 
   // Real-time validation
@@ -217,23 +247,15 @@ const CreateIDScreen = () => {
   const updateAddressFromParts = (
     unit: string,
     street: string,
-    purok: string,
+    _purok: string,
     brgy: string,
     city: string,
-    prov: string,
+    _prov: string,
     region: string,
     zip: string
   ) => {
-    const parts = [
-      unit,
-      street,
-      purok,
-      brgy,
-      city,
-      prov,
-      region,
-      zip,
-    ].filter(Boolean);
+    // Compose address without purok and province per new requirements
+    const parts = [unit, street, brgy, city, region, zip].filter(Boolean);
     setAddress(parts.join(', '));
   };
 
@@ -301,6 +323,9 @@ const CreateIDScreen = () => {
       contact: contactNumber,
       clerk_id: userId,
       face_verification: faceVerificationResult || undefined,
+      region: addrRegion || undefined,
+      city: addrCity || undefined,
+      barangay: addrBarangay || undefined,
     };
     try {
       setLoading(true);
@@ -485,15 +510,35 @@ const CreateIDScreen = () => {
     });
     return resp.data.url as string;
   };
-  const runVerification = async () => {
-    if (!idImage || !selfieImage) return;
+  const runVerification = async (): Promise<boolean> => {
+    if (!idImage || !selfieImage) return false;
     setIsVerifying(true);
     try {
-      const result = await faceppService.verifyFace(idImage, selfieImage, { minConfidence: 60 });
-      setFaceVerificationResult(result);
-      Alert.alert(result.isMatch ? 'Verified' : 'Not Verified', result.isMatch ? 'Face match successful.' : (result.error || 'Face match failed.'));
+      const live = await luxandLiveness(selfieImage);
+      if (!live.passed) {
+        setFaceVerificationResult({ isMatch: false, confidence: 0, faceDetected: false, livenessPassed: false, error: 'Liveness failed. Please retake under better lighting.' });
+        setNoticeTitle('Liveness Failed');
+        setNoticeMessage('Please retake your selfie under better lighting and try again.');
+        setNoticeVisible(true);
+        return false;
+      }
+      const match = await luxandVerify(idImage, selfieImage, { minConfidence: 60 } as any);
+      const combined: FaceVerificationResult = { ...match, livenessPassed: true } as any;
+      setFaceVerificationResult(combined);
+      if (!combined.isMatch) {
+        setNoticeTitle('Face Not Verified');
+        setNoticeMessage(combined.error || `Face similarity too low (${(combined.confidence ?? 0).toFixed(1)}%).`);
+        setNoticeVisible(true);
+        return false;
+      }
+      setSuccessTitle('Verified');
+      setSuccessMessage(`Face match successful (${(combined.confidence ?? 0).toFixed(0)}%).`);
+      return true;
     } catch (e) {
-      Alert.alert('Error', 'Verification failed. Please try again.');
+      setNoticeTitle('Error');
+      setNoticeMessage('Verification failed. Please try again.');
+      setNoticeVisible(true);
+      return false;
     } finally {
       setIsVerifying(false);
     }
@@ -512,7 +557,6 @@ const CreateIDScreen = () => {
       { key: 2, label: 'Verify', icon: 'shield-checkmark' as const },
       { key: 3, label: 'Proof', icon: 'document-text' as const },
       { key: 4, label: 'Review', icon: 'document-text' as const },
-      { key: 5, label: 'Done', icon: 'checkmark-done' as const },
     ];
     return (
       <View style={styles.stepperBar}>
@@ -694,90 +738,48 @@ const CreateIDScreen = () => {
             />
           </View>
         </View>
+        {/* Removed Purok / Sitio / Zone field per requirements */}
         <View style={styles.inputBlock}>
-          <Text style={styles.fieldLabel}>Purok / Sitio / Zone (optional)</Text>
-          <View style={[styles.fieldControl, styles.fieldControlOk]}>
-            <Ionicons name="location-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
-            <TextInput
-              value={addrPurok}
-              onChangeText={(text) => {
-                setAddrPurok(text);
-                updateAddressFromParts(addrUnit, addrStreet, text, addrBarangay, addrCity, addrProvince, addrRegion, addrZip);
-              }}
-              placeholder="e.g., Purok 5 or Sitio Maligaya"
-              placeholderTextColor="#9ca3af"
-              style={styles.fieldInput}
-            />
-          </View>
-        </View>
-        <View style={styles.inputBlock}>
-          <Text style={styles.fieldLabel}>Barangay</Text>
+          <Text style={styles.fieldLabel}>Region</Text>
           <View style={[styles.fieldControl, addressError ? styles.fieldControlError : styles.fieldControlOk]}>
-            <Ionicons name="flag-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
-            <TextInput
-              value={addrBarangay}
-              onChangeText={(text) => {
-                setAddrBarangay(text);
-                updateAddressFromParts(addrUnit, addrStreet, addrPurok, text, addrCity, addrProvince, addrRegion, addrZip);
-                if (text.trim()) validateAddressParts();
-              }}
-              onBlur={validateAddressParts}
-              placeholder="e.g., Barangay San Isidro"
-              placeholderTextColor="#9ca3af"
-              style={styles.fieldInput}
-            />
+            <Ionicons name="compass-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
+            <TouchableOpacity style={[styles.fieldInput, { paddingVertical: 2 }]} onPress={() => setShowRegionPicker(true)}>
+              <Text style={{ color: addrRegion ? '#111827' : '#9ca3af', fontSize: 15 }}>
+                {addrRegion || 'Select Region'}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.fieldSuffix}>
+              <Ionicons name="chevron-down" size={18} color="#94a3b8" />
+            </View>
           </View>
         </View>
         <View style={styles.inputBlock}>
           <Text style={styles.fieldLabel}>City / Municipality</Text>
           <View style={[styles.fieldControl, addressError ? styles.fieldControlError : styles.fieldControlOk]}>
             <Ionicons name="business" size={18} color="#6b7280" style={styles.fieldIcon} />
-            <TextInput
-              value={addrCity}
-              onChangeText={(text) => {
-                setAddrCity(text);
-                updateAddressFromParts(addrUnit, addrStreet, addrPurok, addrBarangay, text, addrProvince, addrRegion, addrZip);
-                if (text.trim()) validateAddressParts();
-              }}
-              onBlur={validateAddressParts}
-              placeholder="e.g., Quezon City or San Mateo"
-              placeholderTextColor="#9ca3af"
-              style={styles.fieldInput}
-            />
+            <TouchableOpacity style={[styles.fieldInput, { paddingVertical: 2 }]} onPress={() => setShowCityPicker(true)}>
+              <Text style={{ color: addrCity ? '#111827' : '#9ca3af', fontSize: 15 }}>
+                {addrCity || 'Select City/Municipality'}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.fieldSuffix}>
+              <Ionicons name="chevron-down" size={18} color="#94a3b8" />
+            </View>
           </View>
         </View>
+        {/* Removed Province field per requirements */}
         <View style={styles.inputBlock}>
-          <Text style={styles.fieldLabel}>Province</Text>
+          <Text style={styles.fieldLabel}>Barangay</Text>
           <View style={[styles.fieldControl, addressError ? styles.fieldControlError : styles.fieldControlOk]}>
-            <Ionicons name="map-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
-            <TextInput
-              value={addrProvince}
-              onChangeText={(text) => {
-                setAddrProvince(text);
-                updateAddressFromParts(addrUnit, addrStreet, addrPurok, addrBarangay, addrCity, text, addrRegion, addrZip);
-                if (text.trim()) validateAddressParts();
-              }}
-              onBlur={validateAddressParts}
-              placeholder="e.g., Rizal"
-              placeholderTextColor="#9ca3af"
-              style={styles.fieldInput}
-            />
-          </View>
-        </View>
-        <View style={styles.inputBlock}>
-          <Text style={styles.fieldLabel}>Region (optional)</Text>
-          <View style={[styles.fieldControl, styles.fieldControlOk]}>
-            <Ionicons name="compass-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
-            <TextInput
-              value={addrRegion}
-              onChangeText={(text) => {
-                setAddrRegion(text);
-                updateAddressFromParts(addrUnit, addrStreet, addrPurok, addrBarangay, addrCity, addrProvince, text, addrZip);
-              }}
-              placeholder="e.g., NCR, Region IV-A CALABARZON"
-              placeholderTextColor="#9ca3af"
-              style={styles.fieldInput}
-            />
+            <Ionicons name="flag-outline" size={18} color="#6b7280" style={styles.fieldIcon} />
+            <TouchableOpacity style={[styles.fieldInput, { paddingVertical: 2 }]} onPress={() => setShowBarangayPicker(true)}>
+              <Text style={{ color: addrBarangay ? '#111827' : '#9ca3af', fontSize: 15 }}>
+                {addrBarangay || 'Select Barangay'}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.fieldSuffix}>
+              <Ionicons name="chevron-down" size={18} color="#94a3b8" />
+            </View>
           </View>
         </View>
         <View style={styles.inputBlock}>
@@ -801,24 +803,7 @@ const CreateIDScreen = () => {
           {!!addressError && <Text style={styles.fieldHelpError}>{addressError}</Text>}
         </View>
 
-        <TouchableOpacity
-          onPress={handleNext}
-          disabled={!isPersonalInfoValid()}
-          accessibilityLabel="Continue to next step"
-          style={[styles.ctaButton, !isPersonalInfoValid() && styles.ctaButtonDisabled]}
-        >
-          {isPersonalInfoValid() ? (
-            <LinearGradient colors={["#0ea5e9", "#6366f1"]} style={styles.ctaGradient}>
-              <Text style={styles.ctaText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </LinearGradient>
-          ) : (
-            <View style={[styles.ctaGradient, { backgroundColor: '#d1d5db' }] }>
-              <Text style={styles.ctaText}>Continue</Text>
-              <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </View>
-          )}
-        </TouchableOpacity>
+        {/* Inline continue removed; bottom-anchored footer handles navigation */}
       </View>
     </View>
   );
@@ -916,41 +901,7 @@ const CreateIDScreen = () => {
     </View>
   );
 
-  const renderSuccessStep = () => (
-    <View style={styles.stepContainer}>
-      <View style={styles.formCard}>
-        <View style={styles.successHeaderRow}>
-          <LinearGradient colors={["#22c55e", "#10b981"]} style={styles.successIconCircle}>
-            <Ionicons name="checkmark" size={22} color="#fff" />
-          </LinearGradient>
-          <Text style={styles.successHeading}>Request submitted</Text>
-        </View>
-        <Text style={styles.successBodyText}>
-          Thank you for submitting your Barangay ID request. We’ll notify you as it progresses.
-        </Text>
-
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryTile}>
-            <Ionicons name="time" size={16} color="#10b981" />
-            <Text style={styles.summaryTileLabel}>Processing</Text>
-            <Text style={styles.summaryTileValue}>2-3 business days</Text>
-          </View>
-          <View style={styles.summaryTile}>
-            <Ionicons name="notifications" size={16} color="#10b981" />
-            <Text style={styles.summaryTileLabel}>Updates</Text>
-            <Text style={styles.summaryTileValue}>SMS + in-app</Text>
-          </View>
-        </View>
-        <View style={styles.summaryRow}>
-          <View style={[styles.summaryTile, styles.summaryTileFull]}>
-            <Ionicons name="location" size={16} color="#10b981" />
-            <Text style={styles.summaryTileLabel}>Pickup</Text>
-            <Text style={styles.summaryTileValue}>Barangay Hall</Text>
-          </View>
-        </View>
-      </View>
-    </View>
-  );
+  // Removed success step (Done) per requirements
 
   const renderCurrentStep = () => {
     switch (currentStep) {
@@ -969,7 +920,7 @@ const CreateIDScreen = () => {
               </LinearGradient>
             </View>
 
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }}>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1, paddingBottom: 12 }}>
             <View style={styles.formCard}>
               {/* ID Upload/Card */}
               <View style={styles.reviewHeaderRow}>
@@ -1024,9 +975,11 @@ const CreateIDScreen = () => {
                   <FaceVerificationCamera onCapture={handleSelfieCapture} onClose={() => setShowCamera(false)} title="Take Selfie" subtitle="Center your face and use good lighting" />
                 </View>
               ) : selfieImage ? (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: selfieImage }} style={styles.imagePreview} />
-                  <View style={styles.overlayButtonsRow}>
+                <>
+                  <View style={styles.selfiePreviewContainer}>
+                    <Image source={{ uri: selfieImage }} style={styles.imagePreview} resizeMode="contain" />
+                  </View>
+                  <View style={styles.inlineActionRow}>
                     <TouchableOpacity style={styles.secondaryButton} onPress={() => setShowCamera(true)}>
                       <Ionicons name="camera" size={16} color="#6b7280" />
                       <Text style={styles.secondaryButtonText}>Retake</Text>
@@ -1036,7 +989,7 @@ const CreateIDScreen = () => {
                       <Text style={styles.secondaryButtonText}>Remove</Text>
                     </TouchableOpacity>
                   </View>
-                </View>
+                </>
               ) : (
                 <TouchableOpacity style={styles.primaryGhostArea} onPress={() => setShowCamera(true)}>
                   <Ionicons name="camera" size={28} color="#4f46e5" />
@@ -1048,40 +1001,6 @@ const CreateIDScreen = () => {
               <View style={styles.requirementTips}>
                 <Text style={styles.tipsTitle}>Selfie Tips</Text>
                 <Text style={styles.tipText}>Center your face, remove glasses if possible, keep a neutral expression.</Text>
-              </View>
-
-              <View style={styles.inlineActionRowRight}>
-                <TouchableOpacity
-                  onPress={handleBack}
-                  style={styles.secondaryButton}
-                >
-                  <Ionicons name="arrow-back" size={16} color="#6b7280" />
-                  <Text style={styles.secondaryButtonText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={async () => {
-                    if (!idImage || !selfieImage) {
-                      Alert.alert('Incomplete', 'Please add your ID and selfie first.');
-                      return;
-                    }
-                    await runVerification();
-                    handleNext();
-                  }}
-                  style={[styles.footerPrimary, ((!idImage || !selfieImage) || isVerifying) && styles.footerPrimaryDisabled]}
-                  disabled={!idImage || !selfieImage || isVerifying}
-                >
-                  {isVerifying ? (
-                    <>
-                      <ActivityIndicator color="#fff" />
-                      <Text style={styles.footerPrimaryText}>Verifying...</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Ionicons name="shield-checkmark" size={18} color="#fff" />
-                      <Text style={styles.footerPrimaryText}>Verify & Continue</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
               </View>
             </View>
             </ScrollView>
@@ -1162,27 +1081,14 @@ const CreateIDScreen = () => {
                 </View>
               )}
 
-              <View style={styles.inlineActionRowRight}>
-                <TouchableOpacity onPress={handleBack} style={styles.secondaryButton}>
-                  <Ionicons name="arrow-back" size={16} color="#6b7280" />
-                  <Text style={styles.secondaryButtonText}>Back</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleNext}
-                  style={[styles.footerPrimary, (!billImage) && styles.footerPrimaryDisabled]}
-                  disabled={!billImage}
-                >
-                  <Ionicons name="arrow-forward" size={18} color="#fff" />
-                  <Text style={styles.footerPrimaryText}>Continue</Text>
-                </TouchableOpacity>
-              </View>
+              {/* Inline Back/Continue removed; bottom-anchored footer handles navigation */}
             </View>
           </View>
         );
       case 4:
         return renderReviewStep();
       case 5:
-        return renderSuccessStep();
+        return null;
       default:
         return renderPersonalInfoStep();
     }
@@ -1192,39 +1098,82 @@ const CreateIDScreen = () => {
   const showFormView = devMode === 'force_form' || !showIdView;
 
   if (showIdView) {
+    const absoluteCardUrl = existingId?.id_card_url
+      ? (existingId.id_card_url.startsWith('http') ? existingId.id_card_url : `${process.env.EXPO_PUBLIC_API_URL}${existingId.id_card_url}`)
+      : null;
+    const issued = existingId?.id_card_generated_at || existingId?.updated_at || existingId?.created_at;
     return (
       <SafeAreaView style={styles.container}>
         <LinearGradient colors={["#f5f7ff", "#fdf2ff"]} style={styles.background} />
-        <View style={{ padding: 16, gap: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Ionicons name="card" size={20} color="#6366f1" />
-            <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827' }}>Your Barangay ID</Text>
-          </View>
-          {existingId?.id_card_url ? (
-            <Image
-              source={{ uri: `${process.env.EXPO_PUBLIC_API_URL}${existingId.id_card_url}` }}
-              style={{ width: '100%', aspectRatio: 1012/638, borderRadius: 12 }}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={{ height: 300, borderRadius: 12, backgroundColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#6b7280' }}>ID image not available</Text>
-            </View>
-          )}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {existingId?.id_card_url && (
-              <TouchableOpacity style={[styles.footerPrimary]} onPress={() => {
-                const link = `${process.env.EXPO_PUBLIC_API_URL}${existingId.id_card_url}`;
-                Alert.alert('ID Link', link);
-              }}>
-                <Ionicons name="download" size={18} color="#fff" />
-                <Text style={styles.footerPrimaryText}>Download</Text>
-              </TouchableOpacity>
-            )}
+        <View style={styles.contentWrap}>
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityLabel="Go back">
+              <Ionicons name="arrow-back" size={22} color="#111827" />
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.secondaryButton]} onLongPress={cycleDevMode}>
               <Ionicons name="settings" size={16} color="#6b7280" />
               <Text style={styles.secondaryButtonText}>Dev: {devMode}</Text>
             </TouchableOpacity>
+          </View>
+
+          <LinearGradient colors={["#eef2ff", "#fdf2ff"]} style={styles.idHero}>
+            <Text style={styles.idHeroTitle}>Barangay Identification Card</Text>
+            <Text style={styles.idHeroSub}>Keep this in a safe place. Download a copy for your records.</Text>
+          </LinearGradient>
+
+          <LinearGradient colors={["#dbeafe", "#ede9fe", "#fef3c7"]} style={styles.idGradientBorder}>
+            <View style={styles.idCardShadowWrap}>
+              {absoluteCardUrl ? (
+                <Image
+                  source={{ uri: absoluteCardUrl }}
+                  style={styles.idCardImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.idCardPlaceholder}>
+                  <Text style={{ color: '#6b7280' }}>ID image not available</Text>
+                </View>
+              )}
+            </View>
+          </LinearGradient>
+          <Text style={styles.idCaption}>Present this along with a valid government ID when required.</Text>
+
+          <View style={styles.idInfoRow}>
+            <View style={styles.idInfoPill}>
+              <Ionicons name="time" size={14} color="#4f46e5" />
+              <Text style={styles.idInfoText}>Issued {issued ? new Date(issued as any).toLocaleDateString() : '—'}</Text>
+            </View>
+            <View style={styles.idInfoPill}>
+              <Ionicons name="shield-checkmark" size={14} color="#10b981" />
+              <Text style={styles.idInfoText}>Verified</Text>
+            </View>
+          </View>
+
+          <View style={styles.idCtaRow}>
+            {absoluteCardUrl && (
+              <TouchableOpacity
+                style={styles.idPrimaryCta}
+                onPress={async () => {
+                  try {
+                    await Linking.openURL(absoluteCardUrl);
+                  } catch {}
+                }}
+              >
+                <Ionicons name="download" size={18} color="#fff" />
+                <Text style={styles.idPrimaryCtaText}>Open / Download</Text>
+              </TouchableOpacity>
+            )}
+            {absoluteCardUrl && (
+              <TouchableOpacity
+                style={styles.idSecondaryCta}
+                onPress={async () => {
+                  try { await Share.share({ message: absoluteCardUrl }); } catch {}
+                }}
+              >
+                <Ionicons name="share-social" size={16} color="#374151" />
+                <Text style={styles.idSecondaryCtaText}>Share</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -1253,7 +1202,7 @@ const CreateIDScreen = () => {
         {renderStepper()}
 
         {/* Step Content */}
-        {currentStep === 2 ? (
+            {currentStep === 2 ? (
           <View style={styles.nonScrollContainer}>{renderCurrentStep()}</View>
         ) : (
           <ScrollView contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
@@ -1262,8 +1211,7 @@ const CreateIDScreen = () => {
         )}
 
         {/* Sticky Footer Actions */}
-        {currentStep !== 2 && currentStep !== 1 && (
-          <View style={styles.footerBar}>
+        <View style={styles.footerBar}>
             <TouchableOpacity
               onPress={handleBack}
               disabled={currentStep === 1}
@@ -1273,8 +1221,32 @@ const CreateIDScreen = () => {
               <Ionicons name="arrow-back" size={18} color={currentStep === 1 ? '#9ca3af' : '#374151'} />
               <Text style={[styles.footerSecondaryText, currentStep === 1 && styles.footerDisabledText]}>Back</Text>
             </TouchableOpacity>
-
-            {currentStep === 3 ? (
+            {currentStep === 2 ? (
+              <TouchableOpacity
+                onPress={async () => {
+                  if (!idImage || !selfieImage) {
+                    setNoticeTitle('Incomplete');
+                    setNoticeMessage('Please add your ID and selfie first.');
+                    setNoticeVisible(true);
+                    return;
+                  }
+                  const ok = await runVerification();
+                  if (ok) setSuccessVisible(true);
+                }}
+                disabled={(!idImage || !selfieImage) || isVerifying}
+                style={[styles.footerPrimary, (((!idImage || !selfieImage) || isVerifying)) && styles.footerPrimaryDisabled]}
+                accessibilityLabel="Verify and continue"
+              >
+                {isVerifying ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                    <Text style={styles.footerPrimaryText}>Verify & Continue</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            ) : currentStep === 4 ? (
               <TouchableOpacity
                 onPress={handleFinalSubmit}
                 disabled={loading || !canSubmit()}
@@ -1293,8 +1265,11 @@ const CreateIDScreen = () => {
             ) : (
               <TouchableOpacity
                 onPress={handleNext}
-                disabled={currentStep === 1 && !isPersonalInfoValid()}
-                style={[styles.footerPrimary, currentStep === 1 && !isPersonalInfoValid() && styles.footerPrimaryDisabled]}
+                disabled={(currentStep === 1 && !isPersonalInfoValid()) || (currentStep === 3 && !billImage)}
+                style={[
+                  styles.footerPrimary,
+                  ((currentStep === 1 && !isPersonalInfoValid()) || (currentStep === 3 && !billImage)) && styles.footerPrimaryDisabled,
+                ]}
                 accessibilityLabel="Next"
               >
                 <Ionicons name="arrow-forward" size={18} color="#fff" />
@@ -1302,7 +1277,6 @@ const CreateIDScreen = () => {
               </TouchableOpacity>
             )}
           </View>
-        )}
       </KeyboardAvoidingView>
 
       {/* Face verification loading modal */}
@@ -1312,6 +1286,38 @@ const CreateIDScreen = () => {
             <ActivityIndicator size="large" color="#6366f1" />
             <Text style={styles.loadingTitle}>Verifying identity</Text>
             <Text style={styles.loadingSub}>Comparing your ID photo and selfie...</Text>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notice Modal */}
+      <Modal visible={noticeVisible} transparent animationType="fade" onRequestClose={() => setNoticeVisible(false)}>
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <Ionicons name="alert-circle" size={22} color="#ef4444" />
+            <Text style={styles.loadingTitle}>{noticeTitle}</Text>
+            <Text style={styles.loadingSub}>{noticeMessage}</Text>
+            <View style={{ height: 8 }} />
+            <TouchableOpacity style={[styles.footerPrimary]} onPress={() => setNoticeVisible(false)}>
+              <Ionicons name="close" size={18} color="#fff" />
+              <Text style={styles.footerPrimaryText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal visible={successVisible} transparent animationType="fade" onRequestClose={() => setSuccessVisible(false)}>
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <Ionicons name="checkmark-circle" size={22} color="#10b981" />
+            <Text style={styles.loadingTitle}>{successTitle}</Text>
+            <Text style={styles.loadingSub}>{successMessage}</Text>
+            <View style={{ height: 8 }} />
+            <TouchableOpacity style={[styles.footerPrimary]} onPress={() => { setSuccessVisible(false); handleNext(); }}>
+              <Ionicons name="arrow-forward" size={18} color="#fff" />
+              <Text style={styles.footerPrimaryText}>Continue</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1338,6 +1344,92 @@ const CreateIDScreen = () => {
         loading={loading}
       />
       {renderDatePickerModal()}
+      {/* Region/City/Barangay pickers */}
+      {(() => {
+        const DATA = PH_GEOGRAPHY;
+        const regionOptions = DATA.regions.map(r => r.name);
+        const currentRegion = DATA.regions.find(r => r.name === addrRegion);
+        const cityOptions = (currentRegion?.cities || []).map(c => c.name);
+        const currentCity = currentRegion?.cities.find(c => c.name === addrCity);
+        const barangayOptions = (currentCity?.barangays || []);
+
+        const renderOptionsModal = (
+          visible: boolean,
+          title: string,
+          options: string[],
+          onSelect: (v: string) => void,
+          onClose: () => void
+        ) => (
+          <Modal visible={visible} transparent animationType="fade">
+            <View style={styles.modalOverlaySimple}>
+              <View style={styles.modalCardSimple}>
+                <Text style={styles.modalTitleSimple}>{title}</Text>
+                <ScrollView style={{ maxHeight: 300 }}>
+                  {options.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+                      <Text style={{ color: '#6b7280' }}>No options available</Text>
+                    </View>
+                  ) : options.map(opt => (
+                    <TouchableOpacity key={opt} style={styles.dateOption} onPress={() => { onSelect(opt); onClose(); }}>
+                      <Text style={styles.dateOptionText}>{opt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={styles.modalActionsRowSimple}>
+                  <TouchableOpacity style={[styles.secondaryButton, { flex: 1 }]} onPress={onClose}>
+                    <Ionicons name="close" size={16} color="#6b7280" />
+                    <Text style={styles.secondaryButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+
+        return (
+          <>
+            {renderOptionsModal(
+              showRegionPicker,
+              'Select Region',
+              regionOptions,
+              (v) => {
+                setAddrRegion(v);
+                // Reset dependent fields
+                setAddrCity("");
+                setAddrBarangay("");
+                updateAddressFromParts(addrUnit, addrStreet, addrPurok, "", "", addrProvince, v, addrZip);
+                validateAddressParts();
+              },
+              () => setShowRegionPicker(false)
+            )}
+
+            {renderOptionsModal(
+              showCityPicker,
+              'Select City/Municipality',
+              cityOptions,
+              (v) => {
+                setAddrCity(v);
+                setAddrBarangay("");
+                updateAddressFromParts(addrUnit, addrStreet, addrPurok, "", v, addrProvince, addrRegion, addrZip);
+                validateAddressParts();
+              },
+              () => setShowCityPicker(false)
+            )}
+
+            {renderOptionsModal(
+              showBarangayPicker,
+              'Select Barangay',
+              barangayOptions,
+              (v) => {
+                setAddrBarangay(v);
+                updateAddressFromParts(addrUnit, addrStreet, addrPurok, v, addrCity, addrProvince, addrRegion, addrZip);
+                validateAddressParts();
+              },
+              () => setShowBarangayPicker(false)
+            )}
+          </>
+        );
+      })()}
     </SafeAreaView>
   );
 };
@@ -1728,6 +1820,133 @@ const styles = StyleSheet.create({
   footerDisabledText: {
     color: '#9ca3af',
   },
+  // ID View styles
+  idHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  contentWrap: {
+    padding: 16,
+    gap: 14,
+  },
+  idHeaderBadge: {},
+  idHeaderTitle: {},
+  idHeaderSub: {},
+  idHero: {
+    marginTop: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  idHeroTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  idHeroSub: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  idGradientBorder: {
+    marginTop: 12,
+    padding: 1,
+    borderRadius: 18,
+  },
+  idCardShadowWrap: {
+    marginTop: 0,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#eef2ff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  idCardImage: {
+    width: '100%',
+    aspectRatio: 1012/638,
+  },
+  idCaption: {
+    marginTop: 8,
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  idCardPlaceholder: {
+    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f3f4f6',
+  },
+  idInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  idInfoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#eef2ff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  idInfoText: {
+    color: '#374151',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  idCtaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: 10,
+    marginTop: 10,
+  },
+  idPrimaryCta: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#6366f1',
+  },
+  idPrimaryCtaText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+  idSecondaryCta: {
+    width: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  idSecondaryCtaText: {
+    color: '#374151',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   // Loading modal styles
   loadingOverlay: {
     flex: 1,
@@ -1788,6 +2007,15 @@ const styles = StyleSheet.create({
   imagePreviewContainer: {
     width: '100%',
     height: 160,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  selfiePreviewContainer: {
+    width: '100%',
+    height: 360,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#f8fafc',
