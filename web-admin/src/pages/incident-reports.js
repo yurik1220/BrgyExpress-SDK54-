@@ -25,6 +25,16 @@ const IncidentReports = () => {
     const [previewSrc, setPreviewSrc] = useState(null);
     const [searchRef, setSearchRef] = useState("");
 
+    // Normalize relative vs absolute media URLs
+    const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000';
+    const toAbsoluteUrl = (value) => {
+        if (!value || typeof value !== 'string') return null;
+        const v = value.trim();
+        if (v.startsWith('http://') || v.startsWith('https://')) return v;
+        const path = v.startsWith('/') ? v : `/${v}`;
+        return `${API_BASE}${path}`;
+    };
+
     // Fetch and categorize incident reports on first render
     useEffect(() => {
         const fetchReports = async () => {
@@ -296,12 +306,12 @@ const IncidentReports = () => {
                                 {selectedReport?.media_url && (
                                     <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb', marginBottom: 12 }}>
                                         {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
-                                        <video controls style={{ width: '100%', maxHeight: 360 }}>
-                                                <source src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} />
+                                            <video controls style={{ width: '100%', maxHeight: 360 }}>
+                                                <source src={toAbsoluteUrl(selectedReport.media_url)} />
                                                 Your browser does not support the video tag.
                                             </video>
                                         ) : (
-                                            <img src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', background: '#f8fafc', cursor: 'pointer' }} onClick={() => setPreviewSrc(`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`)} />
+                                            <img src={toAbsoluteUrl(selectedReport.media_url)} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', background: '#f8fafc', cursor: 'pointer' }} onClick={() => setPreviewSrc(toAbsoluteUrl(selectedReport.media_url))} />
                                         )}
                                     </div>
                                 )}
@@ -397,11 +407,11 @@ const IncidentReports = () => {
                                     <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
                                         {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
                                             <video controls style={{ width: '100%', maxHeight: 360 }}>
-                                                <source src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} />
+                                                <source src={toAbsoluteUrl(selectedReport.media_url)} />
                                                 Your browser does not support the video tag.
                                             </video>
                                         ) : (
-                                            <img src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
+                                            <img src={toAbsoluteUrl(selectedReport.media_url)} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
                                         )}
                                     </div>
                                 )}
