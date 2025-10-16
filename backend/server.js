@@ -38,6 +38,23 @@ const crypto = require('crypto');
 const { Pool } = require("pg");
 const { Expo } = require('expo-server-sdk');
 const axios = require('axios');
+let cloudinary = null;
+try {
+    cloudinary = require('cloudinary').v2;
+    if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)) {
+        cloudinary.config({
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            api_secret: process.env.CLOUDINARY_API_SECRET,
+            secure: true,
+        });
+        console.log('☁️  Cloudinary configured');
+    } else {
+        console.log('ℹ️  Cloudinary not configured; using local storage for images');
+    }
+} catch (e) {
+    console.log('ℹ️  Cloudinary SDK not installed; using local storage for images');
+}
 const FormData = require('form-data');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
@@ -1935,13 +1952,14 @@ app.patch("/api/users/:clerkID", async (req, res) => {
 // Accept multiple possible file fields across request types
 app.post("/api/requests", upload.fields([
     { name: 'media', maxCount: 1 },
+    { name: 'image', maxCount: 1 }, // alias for incident uploads
     { name: 'id_image', maxCount: 1 },
     { name: 'selfie_image', maxCount: 1 },
     { name: 'bill_image', maxCount: 1 }, // Meralco bill
 ]), async (req, res) => {
     const { type, document_type, reason, clerk_id, full_name, birth_date, address, contact, description, title, location, sex, civil_status } = req.body;
     const files = req.files || {};
-    const mediaFile = files.media && files.media[0] ? files.media[0] : null;
+    const mediaFile = files.media && files.media[0] ? files.media[0] : (files.image && files.image[0] ? files.image[0] : null);
     const idImageFile = files.id_image && files.id_image[0] ? files.id_image[0] : null;
     const selfieImageFile = files.selfie_image && files.selfie_image[0] ? files.selfie_image[0] : null;
 
@@ -2044,7 +2062,20 @@ app.post("/api/requests", upload.fields([
                     });
                 }
 
-                const mediaUrl = mediaFile ? `/uploads/${mediaFile.filename}` : null;
+                // Accept direct URL (e.g., Cloudinary) from client or use uploaded file
+                let mediaUrl = req.body.media_url ? String(req.body.media_url) : (mediaFile ? `/uploads/${mediaFile.filename}` : null);
+                // If Cloudinary is configured, mirror to Cloudinary and swap to secure URL
+                if (cloudinary && mediaFile && !req.body.media_url) {
+                    try {
+                        const localPath = path.join(__dirname, 'public', 'uploads', mediaFile.filename);
+                        const uploaded = await cloudinary.uploader.upload(localPath, { folder: 'brgyexpress/incidents', resource_type: 'auto' });
+                        if (uploaded?.secure_url) {
+                            mediaUrl = uploaded.secure_url;
+                        }
+                    } catch (e) {
+                        console.warn('Cloudinary upload failed for incident media:', e?.message || e);
+                    }
+                }
                 const incidentResult = await pool.query(
                     `INSERT INTO incident_reports
                      (title, description, media_url, location, clerk_id, status, created_at)
@@ -2067,9 +2098,48 @@ app.get("/api/requests", async (req, res) => {
     console.log('📋 Fetching all requests (documents, IDs, incidents)...');
     try {
         const [documentRequests, idRequests, incidentReports] = await Promise.all([
-            pool.query("SELECT *, 'Document Request' as type FROM document_requests"),
-            pool.query("SELECT *, 'Create ID' as type FROM id_requests"),
-            pool.query("SELECT *, 'Incident Report' as type FROM incident_reports")
+            pool.query(`
+                SELECT dr.*, 'Document Request' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = dr.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone
+               , COALESCE(
+                   u.selfie_image_url,
+                   (SELECT selfie_image_url FROM id_requests WHERE clerk_id = dr.clerk_id ORDER BY created_at DESC LIMIT 1)
+                 ) as requester_selfie
+                FROM document_requests dr
+                LEFT JOIN users u ON u.clerk_id = dr.clerk_id
+            `),
+            pool.query(`
+                SELECT ir.*, 'Create ID' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = ir.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone
+               , COALESCE(
+                   u.selfie_image_url,
+                   (SELECT selfie_image_url FROM id_requests WHERE clerk_id = ir.clerk_id ORDER BY created_at DESC LIMIT 1)
+                 ) as requester_selfie
+                FROM id_requests ir
+                LEFT JOIN users u ON u.clerk_id = ir.clerk_id
+            `),
+            pool.query(`
+                SELECT inc.*, 'Incident Report' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = inc.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone
+               , COALESCE(
+                   u.selfie_image_url,
+                   (SELECT selfie_image_url FROM id_requests WHERE clerk_id = inc.clerk_id ORDER BY created_at DESC LIMIT 1)
+                 ) as requester_selfie
+                FROM incident_reports inc
+                LEFT JOIN users u ON u.clerk_id = inc.clerk_id
+            `)
         ]);
 
         // Normalize image URLs for ID requests to absolute URLs for reliable display
@@ -2108,9 +2178,42 @@ app.get("/api/requests/:clerkID", async (req, res) => {
     const { clerkID } = req.params;
     try {
         const [documents, ids, incidents] = await Promise.all([
-            pool.query("SELECT *, 'Document Request' as type FROM document_requests WHERE clerk_id = $1", [clerkID]),
-            pool.query("SELECT *, 'Create ID' as type FROM id_requests WHERE clerk_id = $1", [clerkID]),
-            pool.query("SELECT *, 'Incident Report' as type FROM incident_reports WHERE clerk_id = $1", [clerkID])
+            pool.query(`
+                SELECT dr.*, 'Document Request' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = dr.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone,
+                       COALESCE(u.selfie_image_url, (SELECT selfie_image_url FROM id_requests WHERE clerk_id = dr.clerk_id ORDER BY created_at DESC LIMIT 1)) as requester_selfie
+                FROM document_requests dr
+                LEFT JOIN users u ON u.clerk_id = dr.clerk_id
+                WHERE dr.clerk_id = $1
+            `, [clerkID]),
+            pool.query(`
+                SELECT ir.*, 'Create ID' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = ir.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone,
+                       COALESCE(u.selfie_image_url, (SELECT selfie_image_url FROM id_requests WHERE clerk_id = ir.clerk_id ORDER BY created_at DESC LIMIT 1)) as requester_selfie
+                FROM id_requests ir
+                LEFT JOIN users u ON u.clerk_id = ir.clerk_id
+                WHERE ir.clerk_id = $1
+            `, [clerkID]),
+            pool.query(`
+                SELECT inc.*, 'Incident Report' as type,
+                       u.name as requester_name,
+                       COALESCE(
+                         u.phonenumber,
+                         (SELECT contact FROM id_requests WHERE clerk_id = inc.clerk_id ORDER BY created_at DESC LIMIT 1)
+                       ) as requester_phone,
+                       COALESCE(u.selfie_image_url, (SELECT selfie_image_url FROM id_requests WHERE clerk_id = inc.clerk_id ORDER BY created_at DESC LIMIT 1)) as requester_selfie
+                FROM incident_reports inc
+                LEFT JOIN users u ON u.clerk_id = inc.clerk_id
+                WHERE inc.clerk_id = $1
+            `, [clerkID])
         ]);
 
         const toAbsolute = (val) => {

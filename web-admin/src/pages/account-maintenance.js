@@ -180,7 +180,7 @@ const AccountMaintenance = () => {
                                     <tr key={u.id} onClick={() => openUser(u)} style={{ cursor: 'pointer' }}>
                                         <td>{u.name || '-'}</td>
                                         <td>{u.email || '-'}</td>
-                                        <td>{u.contact || '-'}</td>
+                                        <td>{u.phonenumber || u.contact || '-'}</td>
                                         <td>{statusBadge(u.status)}</td>
                                         <td>{u.created_at ? new Date(u.created_at).toLocaleString() : '-'}</td>
                                         <td>
@@ -239,7 +239,7 @@ const AccountMaintenance = () => {
                                     </div>
                                     <div className="detail-item">
                                         <span className="label">Contact Number:</span>
-                                        <span className="value">{selectedUser.contact || '-'}</span>
+                                        <span className="value">{selectedUser.phonenumber || selectedUser.contact || '-'}</span>
                                     </div>
                                     <div className="detail-item">
                                         <span className="label">Address:</span>

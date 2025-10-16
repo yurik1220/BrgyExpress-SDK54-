@@ -206,17 +206,6 @@ const AuditLogs = () => {
             <div className="audit-logs-header">
                 <h1>📋 Audit Logs</h1>
                 <p>Track all administrative actions and system activities</p>
-                <div className="audit-instructions">
-                    <h4>💡 How to use:</h4>
-                    <ul>
-                        <li><strong>Quick Filters:</strong> Click buttons to filter by common time periods and actions</li>
-                        <li><strong>Advanced Filters:</strong> Show/hide detailed filtering options</li>
-                        <li><strong>View Details:</strong> Click the eye icon to see full log information</li>
-                        <li><strong>Status Colors:</strong> Green = Success, Red = Failed</li>
-                        <li><strong>Action Icons:</strong> Visual indicators for different activities</li>
-                        <li><strong>Comprehensive Tracking:</strong> All admin actions are logged including logins, approvals, rejections, and content management</li>
-                    </ul>
-                </div>
             </div>
 
             {/* Quick Stats */}

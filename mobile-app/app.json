@@ -22,7 +22,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/bx-logo.png",
         "backgroundColor": "#999999"
       },
       "package": "com.yurik1220.brgyexpress",

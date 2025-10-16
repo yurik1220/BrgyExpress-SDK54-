@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -49,6 +49,10 @@ const RequestDocumentsScreen = () => {
   const [showReasonDropdown, setShowReasonDropdown] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const [lastSubmitted, setLastSubmitted] = useState<number | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [devBypassEnabled, setDevBypassEnabled] = useState(false);
+  const [eligibilityModalVisible, setEligibilityModalVisible] = useState(false);
+  const [cooldownMessage, setCooldownMessage] = useState("");
 
   const totalSteps = 2;
 
@@ -72,6 +76,24 @@ const RequestDocumentsScreen = () => {
     "Other"
   ];
 
+  useEffect(() => {
+    (async () => {
+      try {
+        if (userId) {
+          const url = `${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`;
+          const r = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
+          const items = (r.data || []).filter((x: any) => x.type === 'Create ID');
+          const approved = items.some((x: any) => x.status === 'approved');
+          setIsVerified(approved);
+        } else {
+          setIsVerified(false);
+        }
+      } catch (e) {
+        setIsVerified(false);
+      }
+    })();
+  }, [userId]);
+
   // Validation helpers
   const isValidDocumentType = (type: string) => type.trim().length > 0;
 
@@ -87,6 +109,11 @@ const RequestDocumentsScreen = () => {
 
   const handleFinalSubmit = () => {
     if (!canSubmit()) return;
+    if (!devBypassEnabled && !isVerified) {
+      setCooldownMessage("");
+      setEligibilityModalVisible(true);
+      return;
+    }
     if (lastSubmitted && Date.now() - lastSubmitted < 30000) {
       Alert.alert("Please wait", "You can only submit a request every 30 seconds.");
       return;
@@ -99,6 +126,25 @@ const RequestDocumentsScreen = () => {
     if (!userId) {
       Alert.alert("Authentication Error", "You must be logged in to submit a request.");
       return;
+    }
+    // Per-type weekly cooldown unless dev bypass
+    if (!devBypassEnabled) {
+      try {
+        const resp = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`, { headers: { 'Cache-Control': 'no-cache' } });
+        const docs: any[] = (resp.data || []).filter((x: any) => x.type === 'Document Request');
+        const now = Date.now();
+        const lastOfType = docs.filter((d: any) => d.document_type === documentType).sort((a: any, b: any) => (new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))[0];
+        if (lastOfType) {
+          const t = lastOfType.created_at ? new Date(lastOfType.created_at).getTime() : 0;
+          if (t && now - t < 7 * 24 * 60 * 60 * 1000) {
+            setCooldownMessage(`You can request ${documentType} only once per week.`);
+            setEligibilityModalVisible(true);
+            return;
+          }
+        }
+      } catch (e) {
+        // do not block if fetch fails
+      }
     }
     const finalReason = reason === "Other" ? otherReason : reason;
     const requestData: RequestData = {
@@ -313,7 +359,15 @@ const RequestDocumentsScreen = () => {
             styles.submitButton,
             (!canSubmit() || loading) && styles.submitButtonDisabled
           ]} 
-          onPress={handleFinalSubmit}
+          onPress={() => {
+            // Verify eligibility before confirmation
+            if (!devBypassEnabled && !isVerified) {
+              setCooldownMessage("");
+              setEligibilityModalVisible(true);
+              return;
+            }
+            handleFinalSubmit();
+          }}
           disabled={!canSubmit() || loading}
         >
           {loading ? (
@@ -380,6 +434,12 @@ const RequestDocumentsScreen = () => {
         style={{ flex: 1 }} 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
+        {/* Verify status loader */}
+        {(() => {
+          // Fetch verification once when component mounts
+          // Using an IIFE here is not ideal; keep logic above instead if refactoring
+          return null;
+        })()}
         <LinearGradient
           colors={['#f8fafc', '#ffffff']}
           style={styles.background}
@@ -401,7 +461,19 @@ const RequestDocumentsScreen = () => {
               >
                 <Ionicons name="document-text" size={24} color="white" />
               </LinearGradient>
-              <Text style={styles.title}>Request Documents</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onLongPress={() => {
+                  if (__DEV__) {
+                    const next = !devBypassEnabled;
+                    setDevBypassEnabled(next);
+                    console.warn(`[DEV MODE] Document Request bypass ${next ? 'ENABLED' : 'DISABLED'}`);
+                    Alert.alert('Dev Mode', `Bypass ${next ? 'enabled' : 'disabled'}`);
+                  }
+                }}
+              >
+                <Text style={styles.title}>Request Documents{__DEV__ && devBypassEnabled ? ' (DEV BYPASS)' : ''}</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
               Request official documents from the barangay office
@@ -443,6 +515,30 @@ const RequestDocumentsScreen = () => {
           loading={loading}
           title="Document Request"
         />
+
+        {/* Eligibility / Cooldown Modal */}
+        <Modal
+          visible={eligibilityModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setEligibilityModalVisible(false)}
+        >
+          <View style={styles.dropdownOverlay}>
+            <View style={styles.dropdownContainer}>
+              <View style={styles.dropdownHeader}>
+                <Text style={styles.dropdownTitle}>Action Restricted</Text>
+                <TouchableOpacity onPress={() => setEligibilityModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
+              <View style={{ padding: 16 }}>
+                <Text style={{ color: '#374151', fontSize: 16 }}>
+                  {cooldownMessage || "You need to have a Barangay ID or complete verification first."}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

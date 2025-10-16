@@ -275,51 +275,14 @@ const IdRequests = () => {
                                         <span className="label">Name:</span>
                                         <span className="value">{request.full_name}</span>
                                     </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-calendar"></i>
-                                        <span className="label">Birth Date:</span>
-                                        <span className="value">{new Date(request.birth_date).toLocaleDateString()}</span>
-                                    </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-map-marker-alt"></i>
-                                        <span className="label">Address:</span>
-                                        <span className="value">{request.address}</span>
-                                    </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-phone"></i>
-                                        <span className="label">Contact:</span>
-                                        <span className="value">{request.contact}</span>
-                                    </div>
+                                    {/* Birth Date/Address/Contact moved to details modal */}
                                     <div className="info-row">
                                         <i className="fas fa-clock"></i>
                                         <span className="label">Requested:</span>
                                         <span className="value">{new Date(request.created_at).toLocaleDateString()}</span>
                                     </div>
                                 </div>
-                                {request.status === "pending" && (
-                                    <div className="card-actions">
-                                        <button 
-                                            className="action-btn approve"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAction(request.id, "approved");
-                                            }}
-                                        >
-                                            <i className="fas fa-check"></i>
-                                            Approve
-                                        </button>
-                                        <button 
-                                            className="action-btn reject"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleAction(request.id, "rejected");
-                                            }}
-                                        >
-                                            <i className="fas fa-times"></i>
-                                            Reject
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Actions moved into detail modal */}
                             </div>
                         </div>
                     ))
@@ -337,14 +300,14 @@ const IdRequests = () => {
                             </button>
                         </div>
                         <div className="modal-body">
-                            <div className="request-details">
+                                <div className="request-details">
                                 <div className="detail-item">
                                     <span className="label">Reference Number:</span>
                                     <span className="value">#{selectedRequest.reference_number}</span>
                                 </div>
                                 <div className="detail-item">
-                                    <span className="label">Full Name:</span>
-                                    <span className="value">{selectedRequest.full_name}</span>
+                                        <span className="label">Full Name:</span>
+                                        <span className="value">{selectedRequest.requester_name || selectedRequest.full_name}</span>
                                 </div>
                                 <div className="detail-item">
                                     <span className="label">Birth Date:</span>
@@ -354,10 +317,10 @@ const IdRequests = () => {
                                     <span className="label">Address:</span>
                                     <span className="value">{selectedRequest.address}</span>
                                 </div>
-                                <div className="detail-item">
-                                    <span className="label">Contact Number:</span>
-                                    <span className="value">{selectedRequest.contact}</span>
-                                </div>
+                                    <div className="detail-item">
+                                        <span className="label">Contact Number:</span>
+                                        <span className="value">{selectedRequest.requester_phone || selectedRequest.contact}</span>
+                                    </div>
                                 <div className="detail-item">
                                     <span className="label">Request Date:</span>
                                     <span className="value">{new Date(selectedRequest.created_at).toLocaleString()}</span>
@@ -493,6 +456,24 @@ const IdRequests = () => {
                             </div>
                         </div>
                         <div className="modal-actions">
+                            {selectedRequest?.status === 'pending' && (
+                                <>
+                                    <button 
+                                        className="btn-success"
+                                        onClick={() => handleAction(selectedRequest.id, 'approved')}
+                                    >
+                                        <i className="fas fa-check"></i>
+                                        Approve
+                                    </button>
+                                    <button 
+                                        className="btn-danger"
+                                        onClick={() => handleAction(selectedRequest.id, 'rejected')}
+                                    >
+                                        <i className="fas fa-times"></i>
+                                        Reject
+                                    </button>
+                                </>
+                            )}
                             <button className="btn-secondary" onClick={() => setShowModal(false)}>
                                 Close
                             </button>
@@ -528,16 +509,7 @@ const IdRequests = () => {
                                     className="rejection-textarea"
                                 />
                             )}
-                            <div className="request-summary">
-                                <div className="summary-item">
-                                    <span className="label">Name:</span>
-                                    <span className="value">{selectedRequest.full_name}</span>
-                                </div>
-                                <div className="summary-item">
-                                    <span className="label">Contact:</span>
-                                    <span className="value">{selectedRequest.contact}</span>
-                                </div>
-                            </div>
+                            {/* Summary removed; details are shown in the details modal */}
                         </div>
                         <div className="modal-actions">
                             <button className="btn-secondary" onClick={() => setShowActionModal(false)}>

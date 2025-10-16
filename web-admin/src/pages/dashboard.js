@@ -10,11 +10,7 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
 
-	// Quick model test state
-	const [modelFile, setModelFile] = useState(null);
-	const [modelLoading, setModelLoading] = useState(false);
-	const [modelError, setModelError] = useState(null);
-	const [modelResult, setModelResult] = useState(null);
+    // (Removed) Quick model test state
 
     useEffect(() => {
         const fetchRequests = async () => {
@@ -93,37 +89,7 @@ const Dashboard = () => {
         }
     };
 
-	const handleModelFileChange = (e) => {
-		const file = e?.target?.files && e.target.files[0] ? e.target.files[0] : null;
-		setModelFile(file);
-		setModelError(null);
-		setModelResult(null);
-	};
-
-	const handleModelTest = async () => {
-		if (!modelFile) {
-			setModelError('Please choose an image.');
-			return;
-		}
-		setModelLoading(true);
-		setModelError(null);
-		setModelResult(null);
-		try {
-			const form = new FormData();
-			form.append('image', modelFile);
-			const resp = await api.post('/api/model/test', form);
-			const data = resp?.data || {};
-			const prob = typeof data.prob_tampered === 'number' ? data.prob_tampered : (typeof data.prob === 'number' ? data.prob : null);
-			const labelRaw = data.pred_label || data.label || null;
-			const label = labelRaw ? labelRaw : (prob !== null ? (prob >= 0.5 ? 'tampered' : 'original') : null);
-			setModelResult({ label, prob });
-		} catch (e) {
-			console.error('Model test failed:', e);
-			setModelError('Prediction failed.');
-		} finally {
-			setModelLoading(false);
-		}
-	};
+    // (Removed) Quick model test handlers
 
     const getTypeIcon = (type) => {
         switch (type) {
@@ -202,13 +168,7 @@ const Dashboard = () => {
                         }).length}</span>
                     </div>
 
-					{/* Quick Tamper Test */}
-					<div className="quick-stat" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-						<input type="file" accept="image/*" onChange={handleModelFileChange} />
-						<button className="view-btn" onClick={handleModelTest} disabled={modelLoading}>
-							{modelLoading ? 'Testing…' : 'Quick Tamper Test'}
-						</button>
-					</div>
+                    
                 </div>
             </div>
 
@@ -268,34 +228,7 @@ const Dashboard = () => {
                             <h3>Urgent Items</h3>
                             <p>Pending requests that need attention</p>
                         </div>
-
-			{/* Model Test Result/Error */}
-			{(modelError || modelResult) && (
-				<div className="overview-grid" style={{ marginTop: 16 }}>
-					<div className="overview-left">
-						<div className="overview-card">
-							<div className="card-header">
-								<h3>Model Test Result</h3>
-							</div>
-							<div style={{ padding: 16 }}>
-								{modelError && (
-									<div className="error-container">
-										<p>{modelError}</p>
-									</div>
-								)}
-								{modelResult && (
-									<div>
-										<p><strong>Prediction:</strong> {modelResult.label}</p>
-										{typeof modelResult.prob === 'number' && (
-											<p><strong>Probability (tampered):</strong> {modelResult.prob.toFixed(4)}</p>
-										)}
-									</div>
-								)}
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
+                        
                         <div className="urgent-items">
                             {urgentItems.length === 0 ? (
                                 <div className="empty-urgent">

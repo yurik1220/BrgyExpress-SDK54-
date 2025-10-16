@@ -7,6 +7,7 @@ import {
     KeyboardAvoidingView, Platform, SafeAreaView,
     ScrollView,
     Switch,
+    Modal,
 } from "react-native";
 // Import camera, location, biometric auth, and routing utilities
 import { CameraView, useCameraPermissions, CameraType } from "expo-camera";
@@ -87,6 +88,10 @@ const IncidentReportScreen = () => {
     const [reportedAt, setReportedAt] = useState<string>("");
     const [isCategoryOpen, setIsCategoryOpen] = useState<boolean>(false);
     const [isUrgencyOpen, setIsUrgencyOpen] = useState<boolean>(false);
+    const [isVerified, setIsVerified] = useState<boolean>(false);
+    const [eligibilityModalVisible, setEligibilityModalVisible] = useState<boolean>(false);
+    const [devBypassEnabled, setDevBypassEnabled] = useState<boolean>(false);
+    const [cooldownMessage, setCooldownMessage] = useState<string>("");
 
     //  useEffect runs on component mount
     useEffect(() => {
@@ -127,6 +132,21 @@ const IncidentReportScreen = () => {
             if (!permission?.granted) {
                 await requestPermission();
             }
+
+            // Determine verification status by checking approved Create ID
+            try {
+                if (userId) {
+                    const url = `${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`;
+                    const r = await axios.get(url, { headers: { 'Cache-Control': 'no-cache' } });
+                    const items = (r.data || []).filter((x: any) => x.type === 'Create ID');
+                    const isApproved = items.some((x: any) => x.status === 'approved');
+                    setIsVerified(isApproved);
+                } else {
+                    setIsVerified(false);
+                }
+            } catch (e) {
+                setIsVerified(false);
+            }
         })();
     }, []);
 
@@ -157,6 +177,43 @@ const IncidentReportScreen = () => {
         setFacing((current) => (current === "back" ? "front" : "back"));
     };
 
+    // Upload incident image to Cloudinary (same approach as Create ID), fallback to backend
+    const uploadIncidentImage = async (localUri: string): Promise<string> => {
+        const fileName = localUri.split('/').pop() || `incident-${Date.now()}.jpg`;
+        const cloudName = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME as string | undefined;
+        const uploadPreset = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET as string | undefined;
+
+        if (cloudName && uploadPreset) {
+            try {
+                const fd: any = new FormData();
+                fd.append('file', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
+                fd.append('upload_preset', uploadPreset);
+                const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`, {
+                    method: 'POST',
+                    body: fd,
+                });
+                if (!res.ok) throw new Error(`Cloudinary ${res.status}`);
+                const json = await res.json();
+                if (json && json.secure_url) return json.secure_url as string;
+                throw new Error('Cloudinary missing secure_url');
+            } catch (e) {
+                // fall through to backend upload / direct file append
+            }
+        }
+
+        // As a secondary option, you may have a generic backend upload endpoint
+        // If not available, we will return empty string to trigger file-based submit
+        try {
+            const fd: any = new FormData();
+            fd.append('image', { uri: localUri, name: fileName, type: 'image/jpeg' } as any);
+            const resp = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/upload-image`, fd, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            if (resp?.data?.url) return String(resp.data.url);
+        } catch {}
+        return '';
+    };
+
     //  Handle initial form validation before submission
     const handleSubmit = async () => {
         if (!title || !description || !media || !selectedCategory || !selectedUrgency) {
@@ -166,6 +223,13 @@ const IncidentReportScreen = () => {
 
         if (!userId) {
             Alert.alert("Authentication Error", "You must be logged in to submit a report.");
+            return;
+        }
+
+        // Eligibility check for verified users unless dev bypass
+        if (!devBypassEnabled && !isVerified) {
+            setCooldownMessage("");
+            setEligibilityModalVisible(true);
             return;
         }
 
@@ -180,6 +244,36 @@ const IncidentReportScreen = () => {
             return;
         }
 
+        // Cooldown checks (skip when dev bypass)
+        if (!devBypassEnabled) {
+            try {
+                const resp = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`, { headers: { 'Cache-Control': 'no-cache' } });
+                const reports: any[] = (resp.data || []).filter((x: any) => x.type === 'Incident Report');
+                const now = Date.now();
+                const within15m = reports.filter((r: any) => {
+                    const t = r.created_at ? new Date(r.created_at).getTime() : 0;
+                    return now - t < 15 * 60 * 1000;
+                });
+                if (within15m.length > 0) {
+                    setCooldownMessage("You can submit only one incident report every 15 minutes.");
+                    setEligibilityModalVisible(true);
+                    return;
+                }
+                const within24h = reports.filter((r: any) => {
+                    const t = r.created_at ? new Date(r.created_at).getTime() : 0;
+                    return now - t < 24 * 60 * 60 * 1000;
+                });
+                if (within24h.length >= 3) {
+                    setCooldownMessage("Maximum of three incident reports per 24 hours reached.");
+                    setEligibilityModalVisible(true);
+                    return;
+                }
+            } catch (e) {
+                // Do not block if unable to fetch history
+            }
+        }
+
+        setCooldownMessage("");
         setIsModalVisible(true); // Show warning modal
     };
 
@@ -225,34 +319,39 @@ const IncidentReportScreen = () => {
                 return;
             }
 
-            // Create FormData object to send image + text
-            const formData = new FormData();
-            formData.append("type", "Incident Report");
-            formData.append("title", title);
-            formData.append("description", description);
-            formData.append("location", userLocation?.join(",") || "");
-            formData.append("clerk_id", userId);
-            formData.append("category", selectedCategory);
-            formData.append("urgency", selectedUrgency);
-            formData.append("anonymous", String(isAnonymous));
-            if (addressText) formData.append("address", addressText);
-            if (reportedAt) formData.append("reported_at", reportedAt);
+            // Attempt Cloudinary direct upload first to get a hosted URL
+            let hostedUrl = '';
+            if (media?.uri) {
+                hostedUrl = await uploadIncidentImage(media.uri);
+            }
 
-            if (media) {
-                formData.append("media", {
+            // Build multipart payload; prefer passing media_url when available
+            const formData = new FormData();
+            formData.append('type', 'Incident Report');
+            formData.append('title', title);
+            formData.append('description', description);
+            formData.append('location', userLocation?.join(',') || '');
+            formData.append('clerk_id', userId);
+            formData.append('category', selectedCategory);
+            formData.append('urgency', selectedUrgency);
+            formData.append('anonymous', String(isAnonymous));
+            if (addressText) formData.append('address', addressText);
+            if (reportedAt) formData.append('reported_at', reportedAt);
+
+            if (hostedUrl) {
+                formData.append('media_url', hostedUrl);
+            } else if (media) {
+                formData.append('media', {
                     uri: media.uri,
-                    name: media.uri.split("/").pop() || `media_${Date.now()}.jpg`,
-                    type: media.type || "image/jpeg",
+                    name: media.uri.split('/').pop() || `media_${Date.now()}.jpg`,
+                    type: media.type || 'image/jpeg',
                 } as any);
             }
 
-            //  Send the report to the Express backend
             const response = await axios.post(
                 `${process.env.EXPO_PUBLIC_API_URL}/api/requests`,
                 formData,
-                {
-                    headers: { "Content-Type": "multipart/form-data" },
-                }
+                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
 
             //  Redirect to details page after successful submission
@@ -378,7 +477,19 @@ const IncidentReportScreen = () => {
                                     <Ionicons name="warning" size={24} color="white" />
                                 </LinearGradient>
                             </View>
-                            <Text style={styles.headerTitle}>Incident Report</Text>
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onLongPress={() => {
+                                    if (__DEV__) {
+                                        const next = !devBypassEnabled;
+                                        setDevBypassEnabled(next);
+                                        console.warn(`[DEV MODE] Incident Report bypass ${next ? 'ENABLED' : 'DISABLED'}`);
+                                        Alert.alert('Dev Mode', `Bypass ${next ? 'enabled' : 'disabled'}`);
+                                    }
+                                }}
+                            >
+                                <Text style={styles.headerTitle}>Incident Report{__DEV__ && devBypassEnabled ? ' (DEV BYPASS)' : ''}</Text>
+                            </TouchableOpacity>
                         </Animated.View>
 
                         {/* Compact Form Container */}
@@ -607,6 +718,29 @@ const IncidentReportScreen = () => {
                                     </View>
                                 </View>
                             </Animated.View>
+                        )}
+                        {/* Eligibility / Cooldown Modal */}
+                        {eligibilityModalVisible && (
+                            <View style={styles.modalOverlay}>
+                                <View style={styles.modalContainer}>
+                                    <View style={styles.modalIconContainer}>
+                                        <Ionicons name="information-circle" size={32} color="white" />
+                                    </View>
+                                    <Text style={styles.modalTitle}>Action Restricted</Text>
+                                    <Text style={styles.modalText}>
+                                        {cooldownMessage || "You need to have a Barangay ID or complete verification first."}
+                                    </Text>
+                                    <View style={styles.modalButtons}>
+                                        <TouchableOpacity
+                                            style={styles.modalConfirmButton}
+                                            onPress={() => setEligibilityModalVisible(false)}
+                                            activeOpacity={0.8}
+                                        >
+                                            <Text style={styles.modalConfirmText}>OK</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            </View>
                         )}
                     </View>
                 )}

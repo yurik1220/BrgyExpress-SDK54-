@@ -13,6 +13,7 @@ const DocumentRequests = () => {
     const [rejectionReason, setRejectionReason] = useState("");
     const [historyFilter, setHistoryFilter] = useState("all");
     const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+    const [imagePreview, setImagePreview] = useState(null);
     const [appointmentDate, setAppointmentDate] = useState("");
     const [appointmentTime, setAppointmentTime] = useState("");
     const [searchRef, setSearchRef] = useState("");
@@ -265,11 +266,7 @@ const DocumentRequests = () => {
                                 </div>
                                 <div className="card-body">
                                     <div className="info-section">
-                                        <div className="info-row">
-                                            <i className="fas fa-user"></i>
-                                            <span className="label">Requester:</span>
-                                            <span className="value">{request.full_name}</span>
-                                        </div>
+                                    {/* Requester moved to details modal */}
                                         <div className="info-row">
                                             <i className="fas fa-calendar"></i>
                                             <span className="label">Requested:</span>
@@ -280,36 +277,9 @@ const DocumentRequests = () => {
                                             <span className="label">Document:</span>
                                             <span className="value">{request.document_type}</span>
                                         </div>
-                                        <div className="info-row">
-                                            <i className="fas fa-phone"></i>
-                                            <span className="label">Contact:</span>
-                                            <span className="value">{request.contact}</span>
-                                        </div>
+                                    {/* Contact moved to details modal */}
                                     </div>
-                                    <div className="card-actions">
-                                        <button 
-                                            className="action-btn approve"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedRequest(request);
-                                                setShowAppointmentModal(true);
-                                            }}
-                                        >
-                                            <i className="fas fa-check"></i>
-                                            Approve
-                                        </button>
-                                        <button 
-                                            className="action-btn reject"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedRequest(request);
-                                                setShowRejectForm(true);
-                                            }}
-                                        >
-                                            <i className="fas fa-times"></i>
-                                            Reject
-                                        </button>
-                                    </div>
+                                    {/* Actions moved into the modal */}
                                 </div>
                             </div>
                         ))
@@ -352,7 +322,7 @@ const DocumentRequests = () => {
                                         <div className="info-row">
                                             <i className="fas fa-user"></i>
                                             <span className="label">Requester:</span>
-                                            <span className="value">{request.full_name}</span>
+                                            <span className="value">{request.requester_name || request.full_name || request.name || request.requester || request.user_full_name || request.user_name || request.requester_name || ((request.first_name && request.last_name) ? `${request.first_name} ${request.last_name}` : null) || request.clerk_id || 'N/A'}</span>
                                         </div>
                                         <div className="info-row">
                                             <i className="fas fa-calendar"></i>
@@ -363,6 +333,11 @@ const DocumentRequests = () => {
                                             <i className="fas fa-file"></i>
                                             <span className="label">Document:</span>
                                             <span className="value">{request.document_type}</span>
+                                        </div>
+                                        <div className="info-row">
+                                            <i className="fas fa-phone"></i>
+                                            <span className="label">Contact:</span>
+                                            <span className="value">{request.contact}</span>
                                         </div>
                                         {request.appointment_date && (
                                             <div className="info-row">
@@ -385,6 +360,96 @@ const DocumentRequests = () => {
                     )
                 )}
             </div>
+
+            {/* Detail Modal with Actions (split layout) */}
+            {selectedRequest && activeTab === 'pending' && (
+                <div className="modal-overlay">
+                    <div className="modal wide-modal">
+                        <div className="modal-header">
+                            <h3>Document Request Details</h3>
+                            <button className="close-btn" onClick={() => setSelectedRequest(null)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 16 }}>
+                              {/* Left: Main details */}
+                              <div className="request-details">
+                                <div className="detail-item">
+                                    <span className="label">Reference Number:</span>
+                                    <span className="value">#{selectedRequest.reference_number}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Requester:</span>
+                                    <span className="value">{selectedRequest.requester_name || selectedRequest.full_name || selectedRequest.name || selectedRequest.requester || selectedRequest.user_full_name || selectedRequest.user_name || selectedRequest.requester_name || ((selectedRequest.first_name && selectedRequest.last_name) ? `${selectedRequest.first_name} ${selectedRequest.last_name}` : null) || selectedRequest.clerk_id || 'N/A'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Contact:</span>
+                                    <span className="value">{selectedRequest.requester_phone || selectedRequest.contact || selectedRequest.phone || selectedRequest.phonenumber || selectedRequest.phone_number || selectedRequest.user_contact || selectedRequest.requester_contact || 'N/A'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Reason:</span>
+                                    <span className="value">{selectedRequest.reason || 'N/A'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Document:</span>
+                                    <span className="value">{selectedRequest.document_type}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="label">Requested:</span>
+                                    <span className="value">{new Date(selectedRequest.created_at).toLocaleString()}</span>
+                                </div>
+                              </div>
+
+                              {/* Right: Requester profile snapshot */}
+                              <div className="request-details" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
+                                <div className="detail-item"><span className="label">Requester:</span><span className="value">{selectedRequest.requester_name || selectedRequest.full_name || selectedRequest.clerk_id}</span></div>
+                                <div className="detail-item"><span className="label">Contact:</span><span className="value">{selectedRequest.requester_phone || selectedRequest.contact || 'N/A'}</span></div>
+                                <div className="detail-item"><span className="label">Clerk ID:</span><span className="value">{selectedRequest.clerk_id}</span></div>
+                                <div style={{ marginTop: 8 }}>
+                                  <div style={{ fontWeight: 600, color: '#374151', marginBottom: 6 }}>Requester's Image</div>
+                                  {(() => {
+                                    const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000';
+                                    const toAbsoluteUrl = (value) => {
+                                      if (!value || typeof value !== 'string') return null;
+                                      const v = value.trim();
+                                      if (v.startsWith('http://') || v.startsWith('https://')) return v;
+                                      const path = v.startsWith('/') ? v : `/${v}`;
+                                      return `${API_BASE}${path}`;
+                                    };
+                                    const src = toAbsoluteUrl(selectedRequest.requester_selfie || selectedRequest.selfie_image_url);
+                                    return src ? (
+                                      <img src={src} alt="Requester Selfie" style={{ width: '100%', maxHeight: 140, objectFit: 'contain', borderRadius: 8, background: '#f8fafc', cursor: 'pointer' }} onClick={() => setImagePreview(src)} />
+                                    ) : (
+                                      <div style={{ fontSize: 13, color: '#6b7280' }}>No selfie image available</div>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </div>
+                        </div>
+                        <div className="modal-actions">
+                            <button 
+                                className="btn-success"
+                                onClick={() => setShowAppointmentModal(true)}
+                            >
+                                <i className="fas fa-check"></i>
+                                Approve & Schedule
+                            </button>
+                            <button 
+                                className="btn-danger"
+                                onClick={() => setShowRejectForm(true)}
+                            >
+                                <i className="fas fa-times"></i>
+                                Reject
+                            </button>
+                            <button className="btn-secondary" onClick={() => setSelectedRequest(null)}>
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Enhanced Modals */}
             {showRejectForm && selectedRequest && (
@@ -453,6 +518,22 @@ const DocumentRequests = () => {
                             <button className="btn-success" onClick={handleApproveWithAppointment}>
                                 Approve & Schedule
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {imagePreview && (
+                <div className="modal-overlay" onClick={() => setImagePreview(null)}>
+                    <div className="modal" style={{ maxWidth: 900 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Image Preview</h3>
+                            <button className="close-btn" onClick={() => setImagePreview(null)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <img src={imagePreview} alt="Preview" style={{ width: '100%', maxHeight: 600, objectFit: 'contain', borderRadius: 8 }} />
                         </div>
                     </div>
                 </div>

@@ -16,11 +16,13 @@ const IncidentReports = () => {
     const [selectedReport, setSelectedReport] = useState(null);
     const [activeTab, setActiveTab] = useState("pending");
     const [showActionModal, setShowActionModal] = useState(false);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [actionType, setActionType] = useState("");
     const [pendingIncidents, setPendingIncidents] = useState([]);
     const [activeIncidents, setActiveIncidents] = useState([]);
     const [closedIncidents, setClosedIncidents] = useState([]);
     const [mapUrl, setMapUrl] = useState("");
+    const [previewSrc, setPreviewSrc] = useState(null);
     const [searchRef, setSearchRef] = useState("");
 
     // Fetch and categorize incident reports on first render
@@ -234,7 +236,7 @@ const IncidentReports = () => {
                         <div
                             key={report.id}
                             className={`report-card ${report.status || 'pending'}-card`}
-                            onClick={() => setSelectedReport(report)}
+                            onClick={() => { setSelectedReport(report); setShowDetailsModal(true); }}
                         >
                             <div className="card-header">
                                 <div className="report-info">
@@ -258,16 +260,7 @@ const IncidentReports = () => {
                                         <span className="label">Title:</span>
                                         <span className="value">{report.title}</span>
                                     </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-map-marker-alt"></i>
-                                        <span className="label">Location:</span>
-                                        <span className="value">{report.location}</span>
-                                    </div>
-                                    <div className="info-row">
-                                        <i className="fas fa-user"></i>
-                                        <span className="label">Reporter:</span>
-                                        <span className="value">{report.clerk_id}</span>
-                                    </div>
+                                    {/* Location/Reporter/Contact moved to details modal */}
                                     <div className="info-row">
                                         <i className="fas fa-calendar"></i>
                                         <span className="label">Reported:</span>
@@ -279,56 +272,112 @@ const IncidentReports = () => {
                                         <span className="value">{report.description}</span>
                                     </div>
                                 </div>
-                                {(report.status === 'pending' || report.status === 'in_progress') && (
-                                    <div className="card-actions">
-                                        {report.status === 'pending' && (
-                                            <button 
-                                                className="action-btn investigate"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedReport(report);
-                                                    setActionType("investigating");
-                                                    setShowActionModal(true);
-                                                }}
-                                            >
-                                                <i className="fas fa-search"></i>
-                                                Start Investigation
-                                            </button>
-                                        )}
-                                        {report.status === 'in_progress' && (
-                                            <button 
-                                                className="action-btn close"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedReport(report);
-                                                    setActionType("resolved");
-                                                    setShowActionModal(true);
-                                                }}
-                                            >
-                                                <i className="fas fa-check"></i>
-                                                Mark Resolved
-                                            </button>
-                                        )}
-                                        <button 
-                                            className="action-btn view-map"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (report.location) {
-                                                    const [longitude, latitude] = report.location.split(",").map(Number);
-                                                    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
-                                                }
-                                            }}
-                                        >
-                                            <i className="fas fa-map"></i>
-                                            View Map
-                                        </button>
-                                    </div>
-                                )}
+                                {/* Actions moved into details modal */}
                             </div>
                         </div>
                     ))
                 )}
             </div>
+
+            {/* Details Modal */}
+            {showDetailsModal && selectedReport && (
+                <div className="modal-overlay">
+                    <div className="modal wide-modal">
+                        <div className="modal-header">
+                            <h3>Incident Report Details</h3>
+                            <button className="close-btn" onClick={() => setShowDetailsModal(false)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 16 }}>
+                              {/* Left: Details + media */}
+                              <div>
+                                {selectedReport?.media_url && (
+                                    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb', marginBottom: 12 }}>
+                                        {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
+                                        <video controls style={{ width: '100%', maxHeight: 360 }}>
+                                                <source src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} />
+                                                Your browser does not support the video tag.
+                                            </video>
+                                        ) : (
+                                            <img src={`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover', background: '#f8fafc', cursor: 'pointer' }} onClick={() => setPreviewSrc(`${process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000'}${selectedReport.media_url}`)} />
+                                        )}
+                                    </div>
+                                )}
+                                <div className="incident-details">
+                                    <div className="detail-item"><span className="label">Reference Number:</span><span className="value">#{selectedReport.reference_number}</span></div>
+                                    <div className="detail-item"><span className="label">Title:</span><span className="value">{selectedReport.title}</span></div>
+                                    <div className="detail-item"><span className="label">Location:</span><span className="value">{selectedReport.location}</span></div>
+                                    <div className="detail-item"><span className="label">Reported:</span><span className="value">{new Date(selectedReport.created_at).toLocaleString()}</span></div>
+                                    <div className="detail-item" style={{ display: 'block' }}>
+                                        <span className="label">Description:</span>
+                                        <div style={{ color: '#1e293b', fontWeight: 500, marginTop: 6 }}>{selectedReport.description}</div>
+                                    </div>
+                                </div>
+                              </div>
+                              {/* Right: Reporter profile snapshot */}
+                              <div className="incident-details" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, padding: 12 }}>
+                                <div className="detail-item"><span className="label">Reporter:</span><span className="value">{selectedReport.requester_name || selectedReport.clerk_id}</span></div>
+                                <div className="detail-item"><span className="label">Contact:</span><span className="value">{selectedReport.requester_phone || '-'}</span></div>
+                                <div className="detail-item"><span className="label">Clerk ID:</span><span className="value">{selectedReport.clerk_id}</span></div>
+                                {(() => {
+                                  const API_BASE = process.env.REACT_APP_API_URL || window.__API_BASE__ || 'http://localhost:5000';
+                                  const toAbsoluteUrl = (value) => {
+                                    if (!value || typeof value !== 'string') return null;
+                                    const v = value.trim();
+                                    if (v.startsWith('http://') || v.startsWith('https://')) return v;
+                                    const path = v.startsWith('/') ? v : `/${v}`;
+                                    return `${API_BASE}${path}`;
+                                  };
+                                  const src = toAbsoluteUrl(selectedReport.requester_selfie || selectedReport.selfie_image_url);
+                                  return src ? (
+                                    <div style={{ marginTop: 8 }}>
+                                      <div style={{ fontWeight: 600, color: '#374151', marginBottom: 6 }}>Selfie</div>
+                                      <img src={src} alt="Reporter Selfie" style={{ width: '100%', maxHeight: 140, objectFit: 'contain', borderRadius: 8, background: '#f8fafc', cursor: 'pointer' }} onClick={() => setPreviewSrc(src)} />
+                                    </div>
+                                  ) : null;
+                                })()}
+                              </div>
+                            </div>
+                        </div>
+                        <div className="modal-actions">
+                            {selectedReport.status === 'pending' && (
+                                <button className="btn-warning" onClick={() => { setShowDetailsModal(false); setActionType('investigating'); setShowActionModal(true); }}>
+                                    <i className="fas fa-search"></i>
+                                    Start Investigation
+                                </button>
+                            )}
+                            {selectedReport.location && (
+                                <button className="btn-primary" onClick={() => {
+                                    const [longitude, latitude] = selectedReport.location.split(',').map(Number);
+                                    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
+                                }}>
+                                    <i className="fas fa-map"></i>
+                                    View Map
+                                </button>
+                            )}
+                            <button className="btn-secondary" onClick={() => setShowDetailsModal(false)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {previewSrc && (
+                <div className="modal-overlay" onClick={() => setPreviewSrc(null)}>
+                    <div className="modal" style={{ maxWidth: 900 }} onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h3>Image Preview</h3>
+                            <button className="close-btn" onClick={() => setPreviewSrc(null)}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <img src={previewSrc} alt="Preview" style={{ width: '100%', maxHeight: 600, objectFit: 'contain', borderRadius: 8 }} />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Enhanced Action Modal */}
             {showActionModal && selectedReport && (
@@ -363,16 +412,8 @@ const IncidentReports = () => {
                                         <span className="value">{selectedReport.title}</span>
                                     </div>
                                     <div className="detail-item">
-                                        <span className="label">Location:</span>
-                                        <span className="value">{selectedReport.location}</span>
-                                    </div>
-                                    <div className="detail-item">
                                         <span className="label">Date:</span>
                                         <span className="value">{new Date(selectedReport.created_at).toLocaleString()}</span>
-                                    </div>
-                                    <div className="detail-item" style={{ display: 'block' }}>
-                                        <span className="label">Description:</span>
-                                        <div style={{ color: '#1e293b', fontWeight: 500, marginTop: 6 }}>{selectedReport.description}</div>
                                     </div>
                                 </div>
                             </div>
