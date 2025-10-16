@@ -245,7 +245,7 @@ const IncidentReportScreen = () => {
         }
 
         // Cooldown checks (skip when dev bypass)
-        if (!devBypassEnabled) {
+        /*if (!devBypassEnabled) {
             try {
                 const resp = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/requests/${userId}?t=${Date.now()}`, { headers: { 'Cache-Control': 'no-cache' } });
                 const reports: any[] = (resp.data || []).filter((x: any) => x.type === 'Incident Report');
@@ -271,7 +271,7 @@ const IncidentReportScreen = () => {
             } catch (e) {
                 // Do not block if unable to fetch history
             }
-        }
+        }*/
 
         setCooldownMessage("");
         setIsModalVisible(true); // Show warning modal
