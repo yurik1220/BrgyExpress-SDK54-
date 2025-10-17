@@ -4,19 +4,27 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import axios from 'axios';
 
-// Configure notification handler
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
-});
+// Feature flag to temporarily disable all notification behavior
+const NOTIFICATIONS_DISABLED = process.env.EXPO_PUBLIC_DISABLE_NOTIFICATIONS === 'true';
+
+// Configure notification handler only when enabled
+if (!NOTIFICATIONS_DISABLED) {
+    Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+            shouldShowAlert: true,
+            shouldPlaySound: true,
+            shouldSetBadge: true,
+        }),
+    });
+}
 
 /**
  * Register device for push notifications and return token
  */
 export const registerForPushNotifications = async () => {
+    if (NOTIFICATIONS_DISABLED) {
+        return null;
+    }
     if (!Device.isDevice) {
         console.warn('Must use physical device for Push Notifications');
         return null;
@@ -36,9 +44,10 @@ export const registerForPushNotifications = async () => {
     }
 
     try {
-        const token = (await Notifications.getExpoPushTokenAsync({
-            projectId: '38e8429e-a3f2-4229-b3ad-1c79389870b2' // Replace with your actual Expo project ID
-        })).data;
+        const projectId = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || process.env.EXPO_PUBLIC_PROJECT_ID;
+        const token = (await Notifications.getExpoPushTokenAsync(
+            projectId ? { projectId } : undefined as any
+        )).data;
 
         console.log('Expo push token:', token);
         return token;
@@ -53,6 +62,9 @@ export const registerForPushNotifications = async () => {
  */
 // Replace the hardcoded URL in savePushTokenToBackend
 export const savePushTokenToBackend = async (userId: string, token: string) => {
+    if (NOTIFICATIONS_DISABLED) {
+        return;
+    }
     try {
         const response = await axios.post(`${process.env.EXPO_PUBLIC_API_URL}/api/save-push-token`, {
             userId,
@@ -73,6 +85,9 @@ export const savePushTokenToBackend = async (userId: string, token: string) => {
  * Setup notification listeners
  */
 export const setupNotificationHandlers = (navigation: any) => {
+    if (NOTIFICATIONS_DISABLED) {
+        return () => {};
+    }
     // Handle notifications received in foreground
     const receivedSubscription = Notifications.addNotificationReceivedListener(notification => {
         console.log('Notification received:', notification);
@@ -113,6 +128,9 @@ export const setupNotificationHandlers = (navigation: any) => {
  * Initialize complete notification system
  */
 export const initNotificationSystem = async (userId: string, navigation: any) => {
+    if (NOTIFICATIONS_DISABLED) {
+        return undefined;
+    }
     try {
         // 1. Register for push notifications
         const token = await registerForPushNotifications();

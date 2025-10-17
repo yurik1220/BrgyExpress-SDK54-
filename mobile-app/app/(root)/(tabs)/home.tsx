@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from "react-native-reanimated";
-import { PanGestureHandler } from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import CustomButton from "@/components/CustomButton";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -46,24 +46,19 @@ export default function Page() {
     transform: [{ translateX: translateX.value }],
   }));
 
-  const onGestureEvent = (event: any) => {
-    const { translationX } = event.nativeEvent;
-    translateX.value = translationX;
-  };
-
-  const onGestureEnd = (event: any) => {
-    const { translationX, velocityX } = event.nativeEvent;
-
-    if (translationX < -50 || velocityX < -500) {
-      setCurrentIndex((prev) => (prev + 1) % slideshowImages.length);
-    } else if (translationX > 50 || velocityX > 500) {
-      setCurrentIndex(
-        (prev) => (prev - 1 + slideshowImages.length) % slideshowImages.length,
-      );
-    }
-
-    translateX.value = withSpring(0);
-  };
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = e.translationX;
+    })
+    .onEnd((e) => {
+      const { translationX, velocityX } = e;
+      if (translationX < -50 || velocityX < -500) {
+        setCurrentIndex((prev) => (prev + 1) % slideshowImages.length);
+      } else if (translationX > 50 || velocityX > 500) {
+        setCurrentIndex((prev) => (prev - 1 + slideshowImages.length) % slideshowImages.length);
+      }
+      translateX.value = withSpring(0);
+    });
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
@@ -113,17 +108,14 @@ export default function Page() {
 
         {/* Slideshow Container */}
         <View style={{ height: 200, marginBottom: 5 }}>
-          <PanGestureHandler
-            onGestureEvent={onGestureEvent}
-            onEnded={onGestureEnd}
-          >
+          <GestureDetector gesture={panGesture}>
             <Animated.View style={[{ flex: 1 }, animatedStyle]}>
               <Image
                 source={slideshowImages[currentIndex]}
                 style={{ width: width - 40, height: 200, borderRadius: 16, marginHorizontal: 20 }}
               />
             </Animated.View>
-          </PanGestureHandler>
+          </GestureDetector>
           
           {/* Pagination Dots */}
           <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 10 }}>
