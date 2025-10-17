@@ -2460,7 +2460,7 @@ app.patch('/api/id-requests/:id', extractAdminInfo, auditLog('Update ID Request'
         return res.status(400).json({ error: "Missing ID request ID or status" });
     }
 
-    const validStatuses = ['approved', 'rejected'];
+    const validStatuses = ['approved', 'rejected', 'completed'];
     if (!validStatuses.includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
     }
@@ -2475,29 +2475,45 @@ app.patch('/api/id-requests/:id', extractAdminInfo, auditLog('Update ID Request'
             return res.status(404).json({ error: "ID request not found" });
         }
 
-        const query = status === 'approved'
-            ? `UPDATE id_requests
-               SET status = $1, resolved_at = NOW(), appointment_date = $3
-               WHERE id = $2
-               RETURNING *`
-            : `UPDATE id_requests
-               SET status = $1, rejection_reason = $3, resolved_at = NOW()
-               WHERE id = $2
-               RETURNING *`;
-
-        const values = status === 'approved'
-            ? [status, id, appointment_date]
-            : [status, id, rejection_reason];
+        let query;
+        let values;
+        if (status === 'approved') {
+            query = `UPDATE id_requests
+                     SET status = $1, resolved_at = NOW(), appointment_date = $3
+                     WHERE id = $2
+                     RETURNING *`;
+            values = [status, id, appointment_date];
+        } else if (status === 'rejected') {
+            query = `UPDATE id_requests
+                     SET status = $1, rejection_reason = $3, resolved_at = NOW()
+                     WHERE id = $2
+                     RETURNING *`;
+            values = [status, id, rejection_reason];
+        } else { // completed
+            query = `UPDATE id_requests
+                     SET status = $1, resolved_at = NOW()
+                     WHERE id = $2
+                     RETURNING *`;
+            values = [status, id];
+        }
 
         const result = await pool.query(query, values);
 
         if (request.rows[0].clerk_id) {
+            let title = `ID Request ${status}`;
+            let bodyMsg = '';
+            if (status === 'approved') {
+                bodyMsg = `Your ID creation request has been approved! Pickup date: ${appointment_date || 'TBA'}`;
+            } else if (status === 'completed') {
+                bodyMsg = 'Your ID request has been completed.';
+            } else {
+                bodyMsg = `Your ID creation request was rejected.${rejection_reason ? ` Reason: ${rejection_reason}` : ''}`;
+            }
+
             const notificationResult = await sendPushNotification(
                 request.rows[0].clerk_id,
-                `ID Request ${status}`,
-                status === 'approved'
-                    ? `Your ID creation request has been approved! Pickup date: ${appointment_date}`
-                    : `Your ID creation request was rejected. Reason: ${rejection_reason}`,
+                title,
+                bodyMsg,
                 {
                     requestId: id,
                     type: 'Create ID',

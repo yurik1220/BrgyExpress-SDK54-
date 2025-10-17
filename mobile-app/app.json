@@ -4,11 +4,11 @@
     "slug": "brgyexpress",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/bx-logo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/logo.png",
+      "image": "./assets/images/bx-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAF9F6"
     },
@@ -17,7 +17,13 @@
       "bundleIdentifier": "com.yurik1220.brgyexpress",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "We use the camera for face verification (blink and head turn liveness)."
+        "NSCameraUsageDescription": "We use the camera for face verification (blink and head turn liveness).",
+        "NSLocationWhenInUseUsageDescription": "Your location is used to tag incidents and verify you are within the barangay.",
+        "NSFaceIDUsageDescription": "Face ID is used to authenticate and secure submissions.",
+        "NSPhotoLibraryUsageDescription": "We access your photo library to attach images to requests.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {

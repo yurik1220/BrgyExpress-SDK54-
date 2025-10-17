@@ -100,11 +100,25 @@ const IdRequests = () => {
         }
     };
 
+    // Directly complete an approved request without opening the action modal
+    const completeRequest = async (requestId) => {
+        try {
+            await api.patch(`/api/id-requests/${requestId}`, { status: 'completed' });
+            await fetchRequests();
+            setShowModal(false);
+            setActiveTab('history');
+        } catch (err) {
+            setError("Failed to update request status");
+        }
+    };
+
     const filteredRequests = requests.filter(request => {
         if (activeTab === "pending") {
             return request.status === "pending";
+        } else if (activeTab === "processing") {
+            return request.status === "approved";
         } else if (activeTab === "history") {
-            return request.status !== "pending";
+            return request.status === "rejected" || request.status === "completed";
         }
         return true;
     }).filter(request =>
@@ -185,6 +199,14 @@ const IdRequests = () => {
                             <i className="fas fa-clock"></i>
                             <span>Pending Requests</span>
                             <span className="tab-count">{requests.filter(req => req.status === "pending").length}</span>
+                        </button>
+                        <button
+                            className={`tab-button ${activeTab === "processing" ? "active" : ""}`}
+                            onClick={() => setActiveTab("processing")}
+                        >
+                            <i className="fas fa-print"></i>
+                            <span>For Processing</span>
+                            <span className="tab-count">{requests.filter(req => req.status === "approved").length}</span>
                         </button>
                         <button
                             className={`tab-button ${activeTab === "history" ? "active" : ""}`}
@@ -281,6 +303,13 @@ const IdRequests = () => {
                                         <span className="label">Requested:</span>
                                         <span className="value">{new Date(request.created_at).toLocaleDateString()}</span>
                                     </div>
+                                    {activeTab === 'processing' && request.id_card_url && (
+                                        <div className="info-row">
+                                            <i className="fas fa-id-card"></i>
+                                            <span className="label">Digital ID:</span>
+                                            <a href={toAbsoluteUrl(request.id_card_url)} target="_blank" rel="noreferrer" className="value" style={{ color: '#2563eb', textDecoration: 'underline' }}>Open</a>
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Actions moved into detail modal */}
                             </div>
@@ -473,6 +502,15 @@ const IdRequests = () => {
                                         Reject
                                     </button>
                                 </>
+                            )}
+                            {selectedRequest?.status === 'approved' && (
+                                <button 
+                                    className="btn-success"
+                                    onClick={() => completeRequest(selectedRequest.id)}
+                                >
+                                    <i className="fas fa-check-circle"></i>
+                                    Completed
+                                </button>
                             )}
                             <button className="btn-secondary" onClick={() => setShowModal(false)}>
                                 Close
