@@ -32,7 +32,9 @@
         "backgroundColor": "#999999"
       },
       "package": "com.yurik1220.brgyexpress",
-      "permissions": ["CAMERA"]
+      "permissions": [
+        "CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -58,7 +60,8 @@
             "buildToolsVersion": "35.0.0"
           }
         }
-      ]
+      ],
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true

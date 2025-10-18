@@ -19,7 +19,8 @@
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 8px;
+    margin-top: -20px;
 }
 
 .header-content h1 {
@@ -112,6 +113,16 @@
 
 .export-btn.json:hover {
     background: linear-gradient(135deg, #4b5563, #6b7280);
+    transform: translateY(-1px);
+}
+
+.export-btn.pdf {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+}
+
+.export-btn.pdf:hover {
+    background: linear-gradient(135deg, #b91c1c, #dc2626);
     transform: translateY(-1px);
 }
 

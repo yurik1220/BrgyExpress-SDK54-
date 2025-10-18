@@ -49,7 +49,7 @@ const IdRequests = () => {
             const prob = typeof selectedRequest.bill_prob_tampered === 'number'
                 ? selectedRequest.bill_prob_tampered
                 : null;
-            const threshold = typeof selectedRequest.bill_threshold_used === 'number' ? selectedRequest.bill_threshold_used : 0.5;
+            const threshold = typeof selectedRequest.bill_threshold_used === 'number' ? selectedRequest.bill_threshold_used : 0.7;
             setAnalysis({ id: null, selfie: null, bill: prob !== null ? { prob, threshold } : null });
             if (prob === null) {
                 setAnalysisError('');
@@ -71,7 +71,32 @@ const IdRequests = () => {
             const idRequests = response.data
                 .filter(item => item.type === 'Create ID')
                 .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            setRequests(idRequests);
+            
+            // Auto-generate ID cards for approved requests that don't have them
+            const approvedRequestsWithoutId = idRequests.filter(req => 
+                req.status === 'approved' && !req.id_card_url
+            );
+            
+            for (const request of approvedRequestsWithoutId) {
+                try {
+                    console.log('Auto-generating ID card for request:', request.id);
+                    await api.post(`/api/id-requests/${request.id}/generate-id-card`);
+                } catch (err) {
+                    console.error('Failed to generate ID card for request:', request.id, err);
+                }
+            }
+            
+            // Refetch requests to get updated data with ID cards
+            if (approvedRequestsWithoutId.length > 0) {
+                const updatedResponse = await api.get("/api/requests");
+                const updatedIdRequests = updatedResponse.data
+                    .filter(item => item.type === 'Create ID')
+                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                setRequests(updatedIdRequests);
+            } else {
+                setRequests(idRequests);
+            }
+            
             setLoading(false);
         } catch (err) {
             setError("Failed to fetch ID requests");
@@ -109,6 +134,18 @@ const IdRequests = () => {
             setActiveTab('history');
         } catch (err) {
             setError("Failed to update request status");
+        }
+    };
+
+    const generateIdCard = async (requestId) => {
+        try {
+            setLoading(true);
+            await api.post(`/api/id-requests/${requestId}/generate-id-card`);
+            await fetchRequests();
+            setShowModal(false);
+        } catch (err) {
+            setError("Failed to generate ID card");
+            setLoading(false);
         }
     };
 
@@ -303,11 +340,53 @@ const IdRequests = () => {
                                         <span className="label">Requested:</span>
                                         <span className="value">{new Date(request.created_at).toLocaleDateString()}</span>
                                     </div>
-                                    {activeTab === 'processing' && request.id_card_url && (
+                                    {activeTab === 'processing' && (
                                         <div className="info-row">
                                             <i className="fas fa-id-card"></i>
                                             <span className="label">Digital ID:</span>
-                                            <a href={toAbsoluteUrl(request.id_card_url)} target="_blank" rel="noreferrer" className="value" style={{ color: '#2563eb', textDecoration: 'underline' }}>Open</a>
+                                            {request.id_card_url ? (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <a 
+                                                        href={toAbsoluteUrl(request.id_card_url)} 
+                                                        target="_blank" 
+                                                        rel="noreferrer" 
+                                                        className="value" 
+                                                        style={{ color: '#2563eb', textDecoration: 'underline' }}
+                                                    >
+                                                        View
+                                                    </a>
+                                                    <a 
+                                                        href={toAbsoluteUrl(request.id_card_url)} 
+                                                        download={`ID_${request.reference_number || request.id}.png`}
+                                                        className="value" 
+                                                        style={{ color: '#059669', textDecoration: 'underline', fontSize: '12px' }}
+                                                    >
+                                                        <i className="fas fa-download"></i> Download
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                    <span style={{ color: '#6b7280', fontSize: '12px' }}>Not generated</span>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            generateIdCard(request.id);
+                                                        }}
+                                                        style={{ 
+                                                            background: '#3b82f6', 
+                                                            color: 'white', 
+                                                            border: 'none', 
+                                                            padding: '4px 8px', 
+                                                            borderRadius: '4px', 
+                                                            fontSize: '11px',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                        disabled={loading}
+                                                    >
+                                                        <i className="fas fa-id-card"></i> Generate
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -394,15 +473,21 @@ const IdRequests = () => {
                                                 <>
                                                     <img src={src} alt="Government ID" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
                                                     {analysis?.id && !analysis?.id?.error && typeof analysis.id.prob === 'number' && (
-                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
-                                                            <span style={{ color: '#374151' }}>Tamper probability:</span>{' '}
-                                                            <span style={{ fontWeight: 700, color: analysis.id.prob >= (analysis.id.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
-                                                                {(analysis.id.prob * 100).toFixed(1)}%
-                                                            </span>
-                                                            {analysis.id.label && (
-                                                                <span style={{ marginLeft: 6, color: '#6b7280' }}>({analysis.id.label})</span>
-                                                            )}
-                                                        </div>
+                                                        (() => {
+                                                            const threshold = Math.max(analysis.id.threshold || 0.7, 0.7);
+                                                            const score = (analysis.id.prob * 100);
+                                                            const isTampered = analysis.id.prob >= threshold;
+                                                            return (
+                                                                <div style={{ marginTop: 8 }}>
+                                                                    <div style={{ fontSize: 13, fontWeight: 700, color: isTampered ? '#dc2626' : '#16a34a' }}>
+                                                                        {isTampered ? `Possible Tampering (Score: ${score.toFixed(1)}%)` : `No Clear Signs of Tampering (Score: ${score.toFixed(1)}%)`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                                                        {isTampered ? 'This image may have been altered or manipulated.' : 'No significant signs of manipulation detected.'}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()
                                                     )}
                                                     {analysisError && (
                                                         <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
@@ -430,15 +515,21 @@ const IdRequests = () => {
                                                 <>
                                                     <img src={src} alt="Live Selfie" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
                                                     {analysis?.selfie && !analysis?.selfie?.error && typeof analysis.selfie.prob === 'number' && (
-                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
-                                                            <span style={{ color: '#374151' }}>Tamper probability:</span>{' '}
-                                                            <span style={{ fontWeight: 700, color: analysis.selfie.prob >= (analysis.selfie.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
-                                                                {(analysis.selfie.prob * 100).toFixed(1)}%
-                                                            </span>
-                                                            {analysis.selfie.label && (
-                                                                <span style={{ marginLeft: 6, color: '#6b7280' }}>({analysis.selfie.label})</span>
-                                                            )}
-                                                        </div>
+                                                        (() => {
+                                                            const threshold = Math.max(analysis.selfie.threshold || 0.7, 0.7);
+                                                            const score = (analysis.selfie.prob * 100);
+                                                            const isTampered = analysis.selfie.prob >= threshold;
+                                                            return (
+                                                                <div style={{ marginTop: 8 }}>
+                                                                    <div style={{ fontSize: 13, fontWeight: 700, color: isTampered ? '#dc2626' : '#16a34a' }}>
+                                                                        {isTampered ? `Possible Tampering (Score: ${score.toFixed(1)}%)` : `Authentic (Score: ${score.toFixed(1)}%)`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                                                        {isTampered ? 'This image may have been altered or manipulated.' : 'No significant signs of manipulation detected.'}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()
                                                     )}
                                                     {analysisError && (
                                                         <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{analysisError}</div>
@@ -465,12 +556,21 @@ const IdRequests = () => {
                                                 <>
                                                     <img src={src} alt="Meralco Bill" style={{ width: '100%', height: 200, objectFit: 'cover', borderRadius: 8 }} />
                                                     {analysis?.bill && !analysis?.bill?.error && typeof analysis.bill.prob === 'number' && (
-                                                        <div style={{ marginTop: 8, fontSize: 13 }}>
-                                                            <span style={{ color: '#374151' }}>Confidence:</span>{' '}
-                                                            <span style={{ fontWeight: 700, color: analysis.bill.prob >= (analysis.bill.threshold || 0.5) ? '#dc2626' : '#16a34a' }}>
-                                                                {(analysis.bill.prob * 100).toFixed(0)}% {analysis.bill.prob >= (analysis.bill.threshold || 0.5) ? 'More likely Tampered' : 'More likely Original'}
-                                                            </span>
-                                                        </div>
+                                                        (() => {
+                                                            const threshold = Math.max(analysis.bill.threshold || 0.7, 0.7);
+                                                            const score = (analysis.bill.prob * 100);
+                                                            const isTampered = analysis.bill.prob >= threshold;
+                                                            return (
+                                                                <div style={{ marginTop: 8 }}>
+                                                                    <div style={{ fontSize: 13, fontWeight: 700, color: isTampered ? '#dc2626' : '#16a34a' }}>
+                                                                        {isTampered ? `Possible Tampering (Score: ${score.toFixed(1)}%)` : `Authentic (Score: ${score.toFixed(1)}%)`}
+                                                                    </div>
+                                                                    <div style={{ fontSize: 12, color: '#6b7280' }}>
+                                                                        {isTampered ? 'This image may have been altered or manipulated.' : 'No significant signs of manipulation detected.'}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()
                                                     )}
                                                     {!analysis?.bill || analysis?.bill?.error ? (
                                                         <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>Failed to analyze bill</div>
@@ -504,13 +604,25 @@ const IdRequests = () => {
                                 </>
                             )}
                             {selectedRequest?.status === 'approved' && (
-                                <button 
-                                    className="btn-success"
-                                    onClick={() => completeRequest(selectedRequest.id)}
-                                >
-                                    <i className="fas fa-check-circle"></i>
-                                    Completed
-                                </button>
+                                <>
+                                    {!selectedRequest.id_card_url && (
+                                        <button 
+                                            className="btn-primary"
+                                            onClick={() => generateIdCard(selectedRequest.id)}
+                                            disabled={loading}
+                                        >
+                                            <i className="fas fa-id-card"></i>
+                                            {loading ? 'Generating...' : 'Generate ID'}
+                                        </button>
+                                    )}
+                                    <button 
+                                        className="btn-success"
+                                        onClick={() => completeRequest(selectedRequest.id)}
+                                    >
+                                        <i className="fas fa-check-circle"></i>
+                                        Completed
+                                    </button>
+                                </>
                             )}
                             <button className="btn-secondary" onClick={() => setShowModal(false)}>
                                 Close

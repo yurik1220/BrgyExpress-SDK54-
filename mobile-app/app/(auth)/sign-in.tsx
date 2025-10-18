@@ -4,46 +4,43 @@ import InputField from "@/components/InputField";
 import { useCallback, useState } from "react";
 import CustomButton from "@/components/CustomButton";
 import { Link, useRouter } from "expo-router";
-import { useSignIn } from "@clerk/clerk-expo";
+import { useSignIn, useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { FadeInDown, FadeIn } from "react-native-reanimated";
+import Modal from "react-native-modal";
 
 const { width } = Dimensions.get("window");
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const { isSignedIn, signOut } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({
-    phoneNumber: "",
+    email: "",
     password: "",
   });
   const [showReset, setShowReset] = useState(false);
-  const [resetPhone, setResetPhone] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetPassword, setResetPassword] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [resetNeedsSecondFactor, setResetNeedsSecondFactor] = useState(false);
   const [resetError, setResetError] = useState("");
+  const [showResetCodeSentModal, setShowResetCodeSentModal] = useState(false);
+  const [showResetSuccessModal, setShowResetSuccessModal] = useState(false);
 
   const onSignInPress = useCallback(async () => {
     if (!isLoaded) return;
 
     // Validate if fields are filled
-    if (!form.phoneNumber || !form.password) {
+    if (!form.email || !form.password) {
       Alert.alert("Missing Fields", "Please fill in all fields.");
       return;
     }
 
     try {
-      // Format phone number
-      const formattedPhoneNumber = form.phoneNumber.startsWith("0")
-        ? "+63" + form.phoneNumber.substring(1)
-        : form.phoneNumber.startsWith("+63")
-          ? form.phoneNumber
-          : "+63" + form.phoneNumber;
-
       const signInAttempt = await signIn.create({
-        identifier: formattedPhoneNumber,
+        identifier: form.email.trim().toLowerCase(),
         password: form.password,
       });
 
@@ -63,29 +60,23 @@ const SignIn = () => {
   const onSendResetCode = useCallback(async () => {
     if (!isLoaded) return;
     try {
-      const formatted = resetPhone.startsWith("0")
-        ? "+63" + resetPhone.substring(1)
-        : resetPhone.startsWith("+63")
-          ? resetPhone
-          : "+63" + resetPhone;
-
       await signIn?.create({
-        strategy: "reset_password_phone_code",
-        identifier: formatted,
+        strategy: "reset_password_email_code",
+        identifier: resetEmail.trim().toLowerCase(),
       });
-      setResetSent(true);
       setResetError("");
+      setShowResetCodeSentModal(true);
     } catch (err: any) {
       console.log(JSON.stringify(err, null, 2));
       setResetError(err.errors?.[0]?.longMessage || "Failed to send reset code");
     }
-  }, [isLoaded, resetPhone, signIn]);
+  }, [isLoaded, resetEmail, signIn]);
 
   const onResetPassword = useCallback(async () => {
     if (!isLoaded) return;
     try {
       const result = await signIn?.attemptFirstFactor({
-        strategy: "reset_password_phone_code",
+        strategy: "reset_password_email_code",
         code: resetCode,
         password: resetPassword,
       });
@@ -95,9 +86,8 @@ const SignIn = () => {
         setResetNeedsSecondFactor(true);
         setResetError("");
       } else if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
         setResetError("");
-        router.replace("/(root)/(tabs)/home");
+        setShowResetSuccessModal(true);
       } else {
         console.log(result);
       }
@@ -108,6 +98,7 @@ const SignIn = () => {
   }, [isLoaded, resetCode, resetPassword, signIn]);
 
   return (
+    <>
     <ScrollView className="flex-1 bg-white">
       <LinearGradient
         colors={['#ffffff', '#f8f9fa']}
@@ -144,12 +135,12 @@ const SignIn = () => {
               </Text>
 
               <InputField
-                label="Phone Number"
-                placeholder="Enter your phone number"
+                label="Email"
+                placeholder="Enter your email"
                 icon={icons.email}
-                keyboardType="phone-pad"
-                value={form.phoneNumber}
-                onChangeText={(value) => setForm({ ...form, phoneNumber: value })}
+                keyboardType="email-address"
+                value={form.email}
+                onChangeText={(value) => setForm({ ...form, email: value })}
                 className="mb-4"
               />
               
@@ -193,12 +184,12 @@ const SignIn = () => {
               {!resetSent && (
                 <>
                   <InputField
-                    label="Phone Number"
-                    placeholder="e.g. +63XXXXXXXXXX"
+                    label="Email"
+                    placeholder="you@example.com"
                     icon={icons.email}
-                    keyboardType="phone-pad"
-                    value={resetPhone}
-                    onChangeText={setResetPhone as any}
+                    keyboardType="email-address"
+                    value={resetEmail}
+                    onChangeText={setResetEmail as any}
                     className="mb-4"
                   />
                   {resetError ? (
@@ -228,7 +219,7 @@ const SignIn = () => {
                   />
                   <InputField
                     label="Reset Code"
-                    placeholder="Enter the code sent to your phone"
+                    placeholder="Enter the code sent to your email"
                     icon={icons.lock}
                     value={resetCode}
                     onChangeText={setResetCode as any}
@@ -255,6 +246,45 @@ const SignIn = () => {
         </Animated.View>
       </View>
     </ScrollView>
+
+    {/* Modal: Code Sent */}
+    <Modal isVisible={showResetCodeSentModal}>
+      <View className="bg-white px-7 py-9 rounded-2xl min-h-[200px]">
+        <Text className="text-2xl font-JakartaBold text-center mb-2">Verification Sent</Text>
+        <Text className="text-base text-gray-600 font-Jakarta text-center mb-6">
+          Verification code has been sent to your email.
+        </Text>
+        <CustomButton
+          title="Continue"
+          onPress={() => { setShowResetCodeSentModal(false); setResetSent(true); }}
+          className="mt-2 h-[56px] rounded-xl"
+        />
+      </View>
+    </Modal>
+
+    {/* Modal: Reset Success */}
+    <Modal isVisible={showResetSuccessModal}>
+      <View className="bg-white px-7 py-9 rounded-2xl min-h-[200px]">
+        <Text className="text-2xl font-JakartaBold text-center mb-2">Password Reset</Text>
+        <Text className="text-base text-gray-600 font-Jakarta text-center mb-6">
+          Your password has been reset.
+        </Text>
+        <CustomButton
+          title="Go to Sign In"
+          onPress={() => {
+            setShowResetSuccessModal(false);
+            setShowReset(false);
+            setResetSent(false);
+            setResetEmail("");
+            setResetCode("");
+            setResetPassword("");
+            (async () => { try { await signOut?.(); } catch {} finally { router.replace('/sign-in'); } })();
+          }}
+          className="mt-2 h-[56px] rounded-xl"
+        />
+      </View>
+    </Modal>
+    </>
   );
 };
 

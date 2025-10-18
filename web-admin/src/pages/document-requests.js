@@ -391,6 +391,18 @@ const DocumentRequests = () => {
                                     <span className="label">Reason:</span>
                                     <span className="value">{selectedRequest.reason || 'N/A'}</span>
                                 </div>
+                                {(() => {
+                                    console.log('Web Admin - selectedRequest:', selectedRequest);
+                                    console.log('Web Admin - remarks value:', selectedRequest.remarks);
+                                    console.log('Web Admin - remarks type:', typeof selectedRequest.remarks);
+                                    return null;
+                                })()}
+                                {selectedRequest.remarks && (
+                                    <div className="detail-item">
+                                        <span className="label">Remarks:</span>
+                                        <span className="value">{selectedRequest.remarks}</span>
+                                    </div>
+                                )}
                                 <div className="detail-item">
                                     <span className="label">Document:</span>
                                     <span className="value">{selectedRequest.document_type}</span>

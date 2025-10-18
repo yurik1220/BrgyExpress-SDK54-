@@ -96,7 +96,7 @@ export const styles = StyleSheet.create({
   },
   stepContent: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingTop: 2,
     paddingBottom: Platform.OS === 'ios' ? 120 : 100,
   },
   mainCard: {

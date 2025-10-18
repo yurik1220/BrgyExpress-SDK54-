@@ -10,18 +10,23 @@ const SessionWarning = () => {
             if (sessionManager.isSessionValid()) {
                 const remaining = sessionManager.getRemainingTime();
                 
-                // Show warning when less than 5 minutes remaining
-                if (remaining <= 5 && remaining > 0) {
+                console.log('Checking session - remaining:', remaining, 'minutes');
+                
+                // Show warning when session is expiring soon
+                if (sessionManager.isSessionExpiringSoon()) {
                     setRemainingTime(Math.ceil(remaining));
                     setShowWarning(true);
+                    console.log('Warning modal should show');
                 } else {
                     setShowWarning(false);
                 }
+            } else {
+                setShowWarning(false);
             }
         };
 
-        // Check every 30 seconds
-        const interval = setInterval(checkSession, 30000);
+        // Check every 2 seconds for more responsive warning
+        const interval = setInterval(checkSession, 2000);
         
         // Initial check
         checkSession();
@@ -29,13 +34,15 @@ const SessionWarning = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const extendSession = () => {
-        sessionManager.extendSession();
-        setShowWarning(false);
-    };
-
     const logout = () => {
         sessionManager.logout();
+    };
+
+    const closeWarning = () => {
+        // Close the warning and reset the session timer (treat as user activity)
+        console.log('Warning closed - restarting session');
+        setShowWarning(false);
+        sessionManager.startSession(); // Restart the session with a fresh 5-minute timer
     };
 
     if (!showWarning) return null;
@@ -60,8 +67,41 @@ const SessionWarning = () => {
                 boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
                 maxWidth: '400px',
                 width: '90%',
-                textAlign: 'center'
+                textAlign: 'center',
+                position: 'relative'
             }}>
+                {/* Close button */}
+                <button
+                    onClick={closeWarning}
+                    style={{
+                        position: 'absolute',
+                        top: '15px',
+                        right: '15px',
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '20px',
+                        cursor: 'pointer',
+                        color: '#999',
+                        width: '30px',
+                        height: '30px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                        e.target.style.background = '#f5f5f5';
+                        e.target.style.color = '#666';
+                    }}
+                    onMouseOut={(e) => {
+                        e.target.style.background = 'none';
+                        e.target.style.color = '#999';
+                    }}
+                    title="Close warning (extends session)"
+                >
+                    ×
+                </button>
                 <div style={{
                     width: '60px',
                     height: '60px',
@@ -92,7 +132,7 @@ const SessionWarning = () => {
                     lineHeight: '1.5'
                 }}>
                     Your session will expire in <strong>{remainingTime} minute{remainingTime !== 1 ? 's' : ''}</strong>. 
-                    Would you like to extend your session?
+                    Please save your work and log in again when needed.
                 </p>
                 
                 <div style={{
@@ -101,9 +141,9 @@ const SessionWarning = () => {
                     justifyContent: 'center'
                 }}>
                     <button
-                        onClick={extendSession}
+                        onClick={closeWarning}
                         style={{
-                            background: '#007bff',
+                            background: '#28a745',
                             color: 'white',
                             border: 'none',
                             padding: '10px 20px',
@@ -113,16 +153,16 @@ const SessionWarning = () => {
                             cursor: 'pointer',
                             transition: 'background 0.2s ease'
                         }}
-                        onMouseOver={(e) => e.target.style.background = '#0056b3'}
-                        onMouseOut={(e) => e.target.style.background = '#007bff'}
+                        onMouseOver={(e) => e.target.style.background = '#218838'}
+                        onMouseOut={(e) => e.target.style.background = '#28a745'}
                     >
-                        Extend Session
+                        Stay Logged In
                     </button>
                     
                     <button
                         onClick={logout}
                         style={{
-                            background: '#6c757d',
+                            background: '#dc3545',
                             color: 'white',
                             border: 'none',
                             padding: '10px 20px',
@@ -132,8 +172,8 @@ const SessionWarning = () => {
                             cursor: 'pointer',
                             transition: 'background 0.2s ease'
                         }}
-                        onMouseOver={(e) => e.target.style.background = '#545b62'}
-                        onMouseOut={(e) => e.target.style.background = '#6c757d'}
+                        onMouseOver={(e) => e.target.style.background = '#c82333'}
+                        onMouseOut={(e) => e.target.style.background = '#dc3545'}
                     >
                         Logout Now
                     </button>

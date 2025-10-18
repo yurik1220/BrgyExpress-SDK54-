@@ -9,6 +9,7 @@ const AnnouncementPage = () => {
     const [error, setError] = useState(null);
     const [showForm, setShowForm] = useState(false);
     const [mediaPreview, setMediaPreview] = useState(null);
+    const [expandedCards, setExpandedCards] = useState(new Set());
     const [formData, setFormData] = useState({
         title: "",
         content: "",
@@ -113,6 +114,25 @@ const AnnouncementPage = () => {
         });
     };
 
+    const toggleCardExpansion = (id) => {
+        const newExpanded = new Set(expandedCards);
+        if (newExpanded.has(id)) {
+            newExpanded.delete(id);
+        } else {
+            newExpanded.add(id);
+        }
+        setExpandedCards(newExpanded);
+    };
+
+    const isContentLong = (content) => {
+        return content && content.length > 150;
+    };
+
+    const getTruncatedContent = (content) => {
+        if (!content) return '';
+        return content.length > 150 ? content.substring(0, 150) + '...' : content;
+    };
+
     if (loading) return (
         <div className="loading-container">
             <div className="loading-spinner"></div>
@@ -213,7 +233,30 @@ const AnnouncementPage = () => {
                             </div>
                             <div className="card-body">
                                 <div className="announcement-content">
-                                    <p>{announcement.content}</p>
+                                    <p>
+                                        {isContentLong(announcement.content) && !expandedCards.has(announcement.id) 
+                                            ? getTruncatedContent(announcement.content)
+                                            : announcement.content
+                                        }
+                                    </p>
+                                    {isContentLong(announcement.content) && (
+                                        <button 
+                                            className="expand-toggle-btn"
+                                            onClick={() => toggleCardExpansion(announcement.id)}
+                                        >
+                                            {expandedCards.has(announcement.id) ? (
+                                                <>
+                                                    <i className="fas fa-chevron-up"></i>
+                                                    <span>Show Less</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <i className="fas fa-chevron-down"></i>
+                                                    <span>Show More</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
                                 </div>
                                 {announcement.media_url && (
                                     <div className="announcement-media">
@@ -254,18 +297,6 @@ const AnnouncementPage = () => {
                                         )}
                                     </div>
                                 )}
-                                <div className="announcement-footer">
-                                    <div className="footer-stats">
-                                        <span className="stat-item">
-                                            <i className="fas fa-comments"></i>
-                                            {announcement.comment_count || 0} comments
-                                        </span>
-                                        <span className="stat-item">
-                                            <i className="fas fa-smile"></i>
-                                            {announcement.reaction_count || 0} reactions
-                                        </span>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     ))

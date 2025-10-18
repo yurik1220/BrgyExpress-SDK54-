@@ -23,11 +23,14 @@ import axios from "axios";
 import { useAuth } from "@clerk/clerk-expo";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from '@expo/vector-icons';
+import * as ImageManipulator from 'expo-image-manipulator';
 import ConfirmationModal from "@/components/ConfirmationModal";
 import * as ImagePicker from 'expo-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import FaceVerificationCamera from "@/components/FaceVerificationCamera";
 import luxand, { FaceVerificationResult, liveness as luxandLiveness, verifyFace as luxandVerify } from "@/lib/luxand";
 import { PH_GEOGRAPHY } from "@/constants/ph-geo";
+import DocumentScanner from 'react-native-document-scanner-plugin';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 768;
@@ -93,6 +96,15 @@ const CreateIDScreen = () => {
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
   const [successVisible, setSuccessVisible] = useState(false);
+
+  // Debug success modal visibility
+  useEffect(() => {
+    console.log('Success modal visibility changed:', successVisible);
+  }, [successVisible]);
+
+
+
+
   const [successTitle, setSuccessTitle] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -361,13 +373,8 @@ const CreateIDScreen = () => {
       if (billUrl) setBillImageUrl(billUrl);
       setLastSubmitted(Date.now());
       setShowConfirmation(false);
-      router.replace({
-        pathname: "/details",
-        params: {
-          ...response.data,
-          fromSubmission: 'true'
-        },
-      });
+      // Show waiting view on this screen until barangay approval
+      try { setExistingId(response.data); } catch {}
     } catch (error) {
       console.error("Submission error:", error);
       Alert.alert(
@@ -452,18 +459,39 @@ const CreateIDScreen = () => {
   // New: inline ID upload + selfie steps like GCash
   const [showCamera, setShowCamera] = useState(false);
   const pickIdImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setIdImage(result.assets[0].uri);
-      setIdImageUrl(null);
+    try {
+      const img: any = await (ImageCropPicker as any).openPicker({
+        mediaType: 'photo',
+        cropping: true,
+        freeStyleCropEnabled: true,
+        compressImageQuality: 0.8,
+      });
+      if (img?.path) {
+        const uri = img.path.startsWith('file://') ? img.path : `file://${img.path}`;
+        setIdImage(uri);
+        setIdImageUrl(null);
+      }
+    } catch (e) {
+      // user cancelled or picker failed; ignore
     }
   };
   const startIdCamera = async () => {
+    try {
+      const scanner: any = DocumentScanner as any;
+      if (scanner?.scanDocument) {
+        const { scannedImages } = await scanner.scanDocument({ maxNumDocuments: 1 });
+        if (scannedImages && scannedImages.length > 0) {
+          setIdImage(scannedImages[0]);
+          setIdImageUrl(null);
+          return;
+        }
+        Alert.alert('Scan Cancelled', 'No document was scanned.');
+        return;
+      }
+    } catch (e) {
+      // fall back below
+    }
+    // Fallback to camera if scanner is unavailable or fails
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [4, 3],
@@ -478,6 +506,26 @@ const CreateIDScreen = () => {
     setSelfieImage(uri);
     setShowCamera(false);
     setSelfieImageUrl(null);
+  };
+  const scanBillDocument = async () => {
+    try {
+      const scanner: any = DocumentScanner as any;
+      if (scanner?.scanDocument) {
+        const { scannedImages } = await scanner.scanDocument({ maxNumDocuments: 1 });
+        if (scannedImages && scannedImages.length > 0) {
+          setBillImage(scannedImages[0]);
+          setBillImageUrl(null);
+          return;
+        }
+        Alert.alert('Scan Cancelled', 'No document was scanned.');
+        return;
+      }
+    } catch (e) {
+      // fall back below
+    }
+    // Fallback to camera if scanner is unavailable or fails
+    const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4,3], quality: 0.9 });
+    if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
   };
   const uploadImageToServer = async (localUri: string): Promise<string> => {
     const fileName = localUri.split('/').pop() || `image-${Date.now()}.jpg`;
@@ -512,9 +560,36 @@ const CreateIDScreen = () => {
   };
   const runVerification = async (): Promise<boolean> => {
     if (!idImage || !selfieImage) return false;
+    console.log('Starting verification process...');
     setIsVerifying(true);
     try {
+      // Run face verification directly
+      console.log('Running face verification...');
+      const success = await runFaceVerification();
+      console.log('Face verification result:', success);
+      if (success) {
+        console.log('Showing success modal...');
+        setSuccessVisible(true);
+        console.log('Success modal visibility set to true');
+      }
+      return success;
+    } catch (e) {
+      console.error('Verification error:', e);
+      setNoticeTitle('Error');
+      setNoticeMessage('Verification failed. Please try again.');
+      setNoticeVisible(true);
+      return false;
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const runFaceVerification = async (): Promise<boolean> => {
+    if (!idImage || !selfieImage) return false;
+    try {
+      console.log('Running liveness check...');
       const live = await luxandLiveness(selfieImage);
+      console.log('Liveness result:', live);
       if (!live.passed) {
         setFaceVerificationResult({ isMatch: false, confidence: 0, faceDetected: false, livenessPassed: false, error: 'Liveness failed. Please retake under better lighting.' });
         setNoticeTitle('Liveness Failed');
@@ -522,7 +597,9 @@ const CreateIDScreen = () => {
         setNoticeVisible(true);
         return false;
       }
+      console.log('Running face matching...');
       const match = await luxandVerify(idImage, selfieImage, { minConfidence: 60 } as any);
+      console.log('Face match result:', match);
       const combined: FaceVerificationResult = { ...match, livenessPassed: true } as any;
       setFaceVerificationResult(combined);
       if (!combined.isMatch) {
@@ -531,16 +608,16 @@ const CreateIDScreen = () => {
         setNoticeVisible(true);
         return false;
       }
+      console.log('Face verification successful, setting success state...');
       setSuccessTitle('Verified');
       setSuccessMessage(`Face match successful (${(combined.confidence ?? 0).toFixed(0)}%).`);
       return true;
     } catch (e) {
+      console.error('Face verification error:', e);
       setNoticeTitle('Error');
       setNoticeMessage('Verification failed. Please try again.');
       setNoticeVisible(true);
       return false;
-    } finally {
-      setIsVerifying(false);
     }
   };
 
@@ -965,6 +1042,7 @@ const CreateIDScreen = () => {
                 <Text style={styles.tipText}>Use a well-lit photo, avoid glare, crop the full ID.</Text>
               </View>
 
+
               {/* Selfie */}
               <View style={[styles.reviewHeaderRow, { marginTop: 12 }]}>
                 <Ionicons name="camera" size={20} color="#6366f1" />
@@ -1032,16 +1110,24 @@ const CreateIDScreen = () => {
                     <Image source={{ uri: billImage }} style={styles.imagePreview} />
                   </View>
                   <View style={styles.inlineActionRow}>
-                    <TouchableOpacity style={styles.secondaryButton} onPress={async () => {
-                      const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4,3], quality: 0.9 });
-                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
-                    }}>
+                    <TouchableOpacity style={styles.secondaryButton} onPress={scanBillDocument}>
                       <Ionicons name="camera" size={16} color="#6b7280" />
                       <Text style={styles.secondaryButtonText}>Retake</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.secondaryButton} onPress={async () => {
-                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as any, allowsEditing: true, aspect: [4,3], quality: 0.8 });
-                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                      try {
+                        const img: any = await (ImageCropPicker as any).openPicker({
+                          mediaType: 'photo',
+                          cropping: true,
+                          freeStyleCropEnabled: true,
+                          compressImageQuality: 0.8,
+                        });
+                        if (img?.path) {
+                          const uri = img.path.startsWith('file://') ? img.path : `file://${img.path}`;
+                          setBillImage(uri);
+                          setBillImageUrl(null);
+                        }
+                      } catch (e) {}
                     }}>
                       <Ionicons name="image" size={16} color="#6b7280" />
                       <Text style={styles.secondaryButtonText}>Replace</Text>
@@ -1059,16 +1145,24 @@ const CreateIDScreen = () => {
               ) : (
                 <View>
                   <View style={styles.actionCardsRow}>
-                    <TouchableOpacity style={styles.actionCard} onPress={async () => {
-                      const result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4,3], quality: 0.9 });
-                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
-                    }}>
+                    <TouchableOpacity style={styles.actionCard} onPress={scanBillDocument}>
                       <Ionicons name="scan" size={18} color="#374151" />
                       <Text style={styles.actionCardText}>Scan Bill</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionCard} onPress={async () => {
-                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'] as any, allowsEditing: true, aspect: [4,3], quality: 0.8 });
-                      if (!result.canceled && result.assets[0]) { setBillImage(result.assets[0].uri); setBillImageUrl(null); }
+                      try {
+                        const img: any = await (ImageCropPicker as any).openPicker({
+                          mediaType: 'photo',
+                          cropping: true,
+                          freeStyleCropEnabled: true,
+                          compressImageQuality: 0.8,
+                        });
+                        if (img?.path) {
+                          const uri = img.path.startsWith('file://') ? img.path : `file://${img.path}`;
+                          setBillImage(uri);
+                          setBillImageUrl(null);
+                        }
+                      } catch (e) {}
                     }}>
                       <Ionicons name="image" size={18} color="#374151" />
                       <Text style={styles.actionCardText}>Upload Photo</Text>
@@ -1096,6 +1190,7 @@ const CreateIDScreen = () => {
 
   const showIdView = devMode === 'force_view' || (devMode === 'auto' && existingId?.status === 'approved');
   const showFormView = devMode === 'force_form' || !showIdView;
+  const showWaitingView = showFormView && !!existingId && existingId?.status !== 'approved';
 
   if (showIdView) {
     const absoluteCardUrl = existingId?.id_card_url
@@ -1180,6 +1275,61 @@ const CreateIDScreen = () => {
     );
   }
 
+  if (showWaitingView) {
+    const issued = existingId?.created_at || existingId?.updated_at;
+    return (
+      <SafeAreaView style={styles.container}>
+        <LinearGradient colors={["#f5f7ff", "#fdf2ff"]} style={styles.background} />
+        <View style={styles.contentWrap}>
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityLabel="Go back">
+              <Ionicons name="arrow-back" size={22} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.screenTitle}>Barangay ID</Text>
+            <View style={styles.backButton} />
+          </View>
+
+          <LinearGradient colors={["#eef2ff", "#fdf2ff"]} style={styles.idHero}>
+            <Text style={styles.idHeroTitle}>Request Submitted</Text>
+            <Text style={styles.idHeroSub}>Please wait while the barangay reviews your request.</Text>
+          </LinearGradient>
+
+          <View style={styles.formCard}>
+            <View style={styles.reviewHeaderRow}>
+              <Ionicons name="time" size={20} color="#6366f1" />
+              <Text style={styles.cardTitle}>Awaiting Approval</Text>
+            </View>
+            <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+              <ActivityIndicator size="large" color="#6366f1" />
+              <Text style={{ marginTop: 10, color: '#374151', fontWeight: '700' }}>Your request of Barangay ID has been submitted.</Text>
+              <Text style={{ marginTop: 6, color: '#6b7280', textAlign: 'center' }}>Please wait for the barangay to check your request.</Text>
+              <View style={styles.idInfoRow}>
+                <View style={styles.idInfoPill}>
+                  <Ionicons name="calendar" size={14} color="#4f46e5" />
+                  <Text style={styles.idInfoText}>Submitted {issued ? new Date(issued as any).toLocaleDateString() : '—'}</Text>
+                </View>
+                <View style={styles.idInfoPill}>
+                  <Ionicons name="shield" size={14} color="#4f46e5" />
+                  <Text style={styles.idInfoText}>Verification pending</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.idCtaRow}>
+              <TouchableOpacity
+                style={styles.idPrimaryCta}
+                onPress={fetchLatestId}
+                accessibilityLabel="Refresh status"
+              >
+                <Ionicons name="refresh" size={18} color="#fff" />
+                <Text style={styles.idPrimaryCtaText}>Refresh Status</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={["#f5f7ff", "#fdf2ff"]} style={styles.background} />
@@ -1230,8 +1380,7 @@ const CreateIDScreen = () => {
                     setNoticeVisible(true);
                     return;
                   }
-                  const ok = await runVerification();
-                  if (ok) setSuccessVisible(true);
+                  await runVerification();
                 }}
                 disabled={(!idImage || !selfieImage) || isVerifying}
                 style={[styles.footerPrimary, (((!idImage || !selfieImage) || isVerifying)) && styles.footerPrimaryDisabled]}
@@ -1314,13 +1463,18 @@ const CreateIDScreen = () => {
             <Text style={styles.loadingTitle}>{successTitle}</Text>
             <Text style={styles.loadingSub}>{successMessage}</Text>
             <View style={{ height: 8 }} />
-            <TouchableOpacity style={[styles.footerPrimary]} onPress={() => { setSuccessVisible(false); handleNext(); }}>
+            <TouchableOpacity style={[styles.footerPrimary]} onPress={() => { 
+              console.log('Success modal continue pressed');
+              setSuccessVisible(false); 
+              handleNext(); 
+            }}>
               <Ionicons name="arrow-forward" size={18} color="#fff" />
               <Text style={styles.footerPrimaryText}>Continue</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
 
       {/* Confirmation Modal */}
       <ConfirmationModal

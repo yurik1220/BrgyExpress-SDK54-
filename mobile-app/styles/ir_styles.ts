@@ -263,19 +263,6 @@ export const styles = StyleSheet.create({
         fontWeight: '600',
     },
 
-    // Anonymous toggle and disclaimer
-    anonRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-        marginTop: 4,
-    },
-    anonHint: {
-        color: '#64748b',
-        fontSize: 12,
-        marginTop: 2,
-    },
     disclaimerBox: {
         flexDirection: 'row',
         alignItems: 'center',

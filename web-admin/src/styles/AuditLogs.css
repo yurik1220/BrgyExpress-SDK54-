@@ -7,21 +7,36 @@
 }
 
 .audit-logs-header {
-    margin-bottom: 30px;
-    text-align: center;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: -20px;
 }
 
-.audit-logs-header h1 {
-    color: #333;
-    margin-bottom: 10px;
-    font-size: 2.5rem;
-    font-weight: 600;
+.header-content h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 4px 0;
+    background: linear-gradient(135deg, #1e293b, #475569);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-.audit-logs-header p {
-    color: #666;
-    font-size: 1.1rem;
-    margin: 0 0 20px 0;
+.header-content p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+    font-weight: 500;
 }
 
 .audit-instructions {
@@ -163,25 +178,20 @@
     background: #1565c0;
 }
 
-/* Advanced Filters Toggle */
-.advanced-filters-toggle {
-    text-align: center;
-    margin-bottom: 20px;
-}
-
 .toggle-filters-btn {
-    background: #6c757d;
-    color: white;
+    background: #e9ecef;
     border: none;
-    padding: 10px 20px;
-    border-radius: 25px;
+    padding: 8px 16px;
+    border-radius: 20px;
     cursor: pointer;
     font-size: 0.9rem;
-    transition: background-color 0.2s ease;
+    transition: all 0.2s ease;
+    color: #495057;
 }
 
 .toggle-filters-btn:hover {
-    background: #5a6268;
+    background: #dee2e6;
+    transform: translateY(-1px);
 }
 
 /* Filters */
@@ -191,6 +201,27 @@
     border-radius: 8px;
     margin-bottom: 30px;
     border: 1px solid #e9ecef;
+}
+
+.filter-section {
+    margin-bottom: 25px;
+    padding: 15px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+}
+
+.filter-section:last-child {
+    margin-bottom: 0;
+}
+
+.filter-section h4 {
+    margin: 0 0 15px 0;
+    color: #495057;
+    font-size: 1rem;
+    font-weight: 600;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 8px;
 }
 
 .filter-row {
@@ -226,6 +257,22 @@
 }
 
 .filter-group input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.filter-group select {
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    background: white;
+    transition: border-color 0.15s ease-in-out;
+    cursor: pointer;
+}
+
+.filter-group select:focus {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
@@ -317,9 +364,10 @@
     font-size: 0.9rem;
 }
 
-.admin-info .admin-id {
+.admin-info .admin-role {
     font-size: 0.75rem;
     color: #6c757d;
+    font-style: italic;
 }
 
 .action-content {
@@ -367,23 +415,6 @@
     color: #721c24;
 }
 
-.ip-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.ip-info .ip-address {
-    font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
-    color: #495057;
-    font-weight: 500;
-}
-
-.ip-info .user-agent {
-    font-size: 0.7rem;
-    color: #6c757d;
-    font-style: italic;
-}
 
 .view-details-btn {
     background: #007bff;
@@ -484,8 +515,7 @@
         padding: 8px 6px;
     }
     
-    .timestamp,
-    .ip {
+    .timestamp {
         font-size: 0.75rem;
     }
     

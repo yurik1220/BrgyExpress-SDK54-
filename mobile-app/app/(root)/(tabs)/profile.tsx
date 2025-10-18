@@ -25,7 +25,7 @@ import { useTabBarVisibility } from './_layout';
 
 interface UserData {
     id: string;
-    name: string;
+    username: string;
     clerk_id: string;
     requests_completed: number;
     requests_pending: number;
@@ -44,7 +44,7 @@ const Profile = () => {
     const [user, setUser] = useState<UserData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [tempName, setTempName] = useState('');
+    const [tempUsername, setTempUsername] = useState('');
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -54,8 +54,9 @@ const Profile = () => {
                 }
 
                 const response = await axios.get(`${process.env.EXPO_PUBLIC_API_URL}/api/users/${userId}`);
+                console.log('User data from backend:', response.data);
                 setUser(response.data);
-                setTempName(response.data.name);
+                setTempUsername(response.data.username || 'User');
             } catch (err) {
                 console.error('Failed to fetch user data:', err);
                 setError('Failed to load profile data');
@@ -87,14 +88,14 @@ const Profile = () => {
 
     const handleUpdateProfile = async () => {
         try {
-            if (!tempName.trim()) {
-                Alert.alert('Error', 'Name cannot be empty');
+            if (!tempUsername.trim()) {
+                Alert.alert('Error', 'Username cannot be empty');
                 return;
             }
 
             const response = await axios.patch(
                 `${process.env.EXPO_PUBLIC_API_URL}/api/users/${userId}`,
-                { name: tempName }
+                { username: tempUsername }
             );
 
             setUser(response.data);
@@ -166,6 +167,10 @@ const Profile = () => {
             </SafeAreaView>
         );
     }
+
+    // Ensure username exists, fallback to 'User' if not
+    const displayUsername = user.username || 'User';
+    const displayInitial = displayUsername.charAt(0).toUpperCase();
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#ffffff' }} edges={['top', 'right', 'left', 'bottom']}>
@@ -269,7 +274,7 @@ const Profile = () => {
                             }}
                         >
                             <Text style={{ fontSize: 24, fontWeight: '700', color: '#ffffff' }}>
-                                {user.name.charAt(0).toUpperCase()}
+                                {displayInitial}
                             </Text>
                         </LinearGradient>
                         
@@ -281,7 +286,7 @@ const Profile = () => {
                                 marginBottom: 4,
                                 letterSpacing: -0.3
                             }}>
-                                {user.name}
+                                {displayUsername}
                             </Text>
                             <Text style={{ 
                                 color: '#6b7280', 
@@ -771,9 +776,9 @@ const Profile = () => {
                                     color: '#1f2937',
                                     fontWeight: '500',
                                 }}
-                                value={tempName}
-                                onChangeText={setTempName}
-                                placeholder="Enter your name"
+                                value={tempUsername}
+                                onChangeText={setTempUsername}
+                                placeholder="Enter your username"
                                 placeholderTextColor="#9ca3af"
                             />
                         </View>

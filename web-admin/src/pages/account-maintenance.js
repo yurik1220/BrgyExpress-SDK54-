@@ -156,7 +156,7 @@ const AccountMaintenance = () => {
                     <table className="requests-table">
                         <thead>
                             <tr>
-                                <th>Name</th>
+                                <th>Username</th>
                                 <th>Email</th>
                                 <th>Contact</th>
                                 <th>Status</th>
@@ -178,7 +178,7 @@ const AccountMaintenance = () => {
                             ) : (
                                 users.map(u => (
                                     <tr key={u.id} onClick={() => openUser(u)} style={{ cursor: 'pointer' }}>
-                                        <td>{u.name || '-'}</td>
+                                        <td>{u.username || '-'}</td>
                                         <td>{u.email || '-'}</td>
                                         <td>{u.phonenumber || u.contact || '-'}</td>
                                         <td>{statusBadge(u.status)}</td>

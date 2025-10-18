@@ -282,6 +282,32 @@
     margin: 0;
 }
 
+.expand-toggle-btn {
+    background: none;
+    border: none;
+    color: #667eea;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.expand-toggle-btn:hover {
+    background-color: #f0f4ff;
+    color: #4f46e5;
+}
+
+.expand-toggle-btn i {
+    font-size: 10px;
+    transition: transform 0.2s ease;
+}
+
 .announcement-media {
     margin-bottom: 20px;
 }

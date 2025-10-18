@@ -217,17 +217,6 @@ export default function AnnouncementsList() {
                         </View>
                     </View>
 
-                    {/* Content */}
-                    <View style={{ marginBottom: item.media_url ? 16 : 0 }}>
-                        <Text style={{ 
-                            color: '#6b7280', 
-                            fontSize: 14,
-                            lineHeight: 20,
-                            fontWeight: '400'
-                        }} numberOfLines={3}>
-                            {item.content}
-                        </Text>
-                    </View>
 
                     {/* Media */}
                     {item.media_url && (

@@ -21,8 +21,8 @@ const SignUp = () => {
   const [resendTimer, setResendTimer] = useState(0);
 
   const [form, setForm] = useState({
-    name: "",
-    phoneNumber: "",
+    username: "",
+    email: "",
     password: "",
     confirmPassword: "",
   });
@@ -60,23 +60,16 @@ const SignUp = () => {
     }
 
     try {
-      // Format phone number
-      const formattedPhoneNumber = form.phoneNumber.startsWith("0")
-        ? "+63" + form.phoneNumber.substring(1)
-        : form.phoneNumber.startsWith("+63")
-          ? form.phoneNumber
-          : "+63" + form.phoneNumber;
-
-      // 1. Create account with name, phone number & password
+      // 1. Create account with email & password
       await signUp.create({
-        phoneNumber: formattedPhoneNumber,
+        emailAddress: form.email.trim().toLowerCase(),
         password: form.password,
       });
 
-      // 2. Send SMS verification code
-      await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+      // 2. Send email verification code
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
 
-      // 3. Open the phone verification modal and start timer
+      // 3. Open the email verification modal and start timer
       setVerification({ state: "pending", error: "", code: "" });
       startResendTimer();
     } catch (err: any) {
@@ -84,38 +77,35 @@ const SignUp = () => {
     }
   };
 
-  const onPressVerifyPhoneNumber = async () => {
+  const onPressVerifyEmail = async () => {
     if (!isLoaded) return;
 
     try {
-      const result = await signUp.attemptPhoneNumberVerification({
-        code: verification.code,
-      });
+      const result = await signUp.attemptEmailAddressVerification({ code: verification.code });
 
       if (result.status === "complete" && result.createdSessionId) {
-        // Format phone number
-        const formattedPhoneNumber = form.phoneNumber.startsWith("0")
-          ? "+63" + form.phoneNumber.substring(1)
-          : form.phoneNumber.startsWith("+63")
-            ? form.phoneNumber
-            : "+63" + form.phoneNumber;
-
         // 4. Send user data to the backend API   
-        await fetchAPI(`${process.env.EXPO_PUBLIC_API_URL}/api/users`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name,
-            phonenumber: formattedPhoneNumber,
-            clerkId: signUp.createdUserId,
-            createdAt: new Date().toISOString(),
-          }),
-        });
+        try {
+          await fetchAPI(`${process.env.EXPO_PUBLIC_API_URL}/api/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              username: form.username,
+              email: form.email.trim().toLowerCase(),
+              clerkId: signUp.createdUserId,
+              createdAt: new Date().toISOString(),
+            }),
+          });
+        } catch (dbError) {
+          console.error('❌ Database user creation failed:', dbError);
+          // Continue with signup even if DB fails - user is created in Clerk
+        }
 
         // Log the user in
         await setActive({ session: result.createdSessionId });
 
         // 5. Show the success modal
+        setVerification({ state: "default", error: "", code: "" });
         setShowSuccessModal(true);
       } else {
         setVerification({
@@ -137,7 +127,7 @@ const SignUp = () => {
     if (!isLoaded || resendTimer > 0) return;
 
     try {
-      await signUp.preparePhoneNumberVerification({ strategy: "phone_code" });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       startResendTimer();
       Alert.alert("Success", "Verification code has been resent.");
     } catch (err: any) {
@@ -180,21 +170,21 @@ const SignUp = () => {
           </Text>
 
           <InputField
-            label="Name"
-            placeholder="Enter your name"
+            label="Username"
+            placeholder="Enter your username"
             icon={icons.person}
-            value={form.name}
-            onChangeText={(v) => setForm({ ...form, name: v })}
+            value={form.username}
+            onChangeText={(v) => setForm({ ...form, username: v })}
             className="mb-3"
           />
           
           <InputField
-            label="Phone Number"
-            placeholder="Enter your phone number"
+            label="Email"
+            placeholder="you@example.com"
             icon={icons.email}
-            value={form.phoneNumber}
-            keyboardType="phone-pad"
-            onChangeText={(v) => setForm({ ...form, phoneNumber: v })}
+            value={form.email}
+            keyboardType="email-address"
+            onChangeText={(v) => setForm({ ...form, email: v })}
             className="mb-3"
           />
           
@@ -267,7 +257,7 @@ const SignUp = () => {
         </View>
       </Modal>
 
-      {/* Phone Verification Modal */}
+      {/* Email Verification Modal */}
       <Modal isVisible={verification.state === "pending"}>
         <View className="bg-white px-7 py-9 rounded-2xl min-h-[300px]">
           <View className="flex-row justify-between items-center mb-4">
@@ -280,13 +270,13 @@ const SignUp = () => {
             >
               <Ionicons name="arrow-back" size={24} color="#666" />
             </Pressable>
-            <Text className="text-2xl font-JakartaExtraBold">Phone Verification</Text>
+            <Text className="text-2xl font-JakartaExtraBold">Email Verification</Text>
             <View style={{ width: 60 }} />
           </View>
 
           <Text className="font-Jakarta mb-5">
             <Text>We've sent a verification code to </Text>
-            <Text className="font-Jakarta-SemiBold">{form.phoneNumber}</Text>
+            <Text className="font-Jakarta-SemiBold">{form.email}</Text>
           </Text>
           
           <InputField
@@ -304,8 +294,8 @@ const SignUp = () => {
           )}
 
           <CustomButton 
-            title="Verify Phone" 
-            onPress={onPressVerifyPhoneNumber} 
+            title="Verify Email" 
+            onPress={onPressVerifyEmail} 
             className="h-[56px] rounded-xl bg-success-500" 
           />
 

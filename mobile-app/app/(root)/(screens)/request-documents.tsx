@@ -33,6 +33,7 @@ interface RequestData {
   type: string;
   document_type: string;
   reason: string;
+  remarks: string;
   clerk_id: string | null;
 }
 
@@ -43,6 +44,7 @@ const RequestDocumentsScreen = () => {
   const [documentType, setDocumentType] = useState("");
   const [reason, setReason] = useState("");
   const [otherReason, setOtherReason] = useState("");
+  const [remarks, setRemarks] = useState("");
   const [loading, setLoading] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [showDocumentDropdown, setShowDocumentDropdown] = useState(false);
@@ -151,6 +153,7 @@ const RequestDocumentsScreen = () => {
       type: "Document Request",
       document_type: documentType,
       reason: finalReason,
+      remarks: remarks,
       clerk_id: userId,
     };
     try {
@@ -198,11 +201,13 @@ const RequestDocumentsScreen = () => {
   const confirmationData = {
     document_type: documentType,
     reason: reason === "Other" ? otherReason : reason,
+    remarks: remarks,
   };
 
   const dataLabels = {
     document_type: "Document Type",
     reason: "Reason",
+    remarks: "Remarks",
   };
 
   const renderProgressBar = () => (
@@ -328,6 +333,28 @@ const RequestDocumentsScreen = () => {
                 </Text>
               </Animated.View>
             )}
+
+            {/* Remarks Section */}
+            <Animated.View 
+              entering={FadeInDown.duration(300).delay(100)}
+              style={{ marginTop: 24 }}
+            >
+              <Text style={styles.inputLabel}>Additional Remarks (Optional)</Text>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={[styles.textInput, styles.textArea]}
+                  placeholder="e.g., Request 3 copies, Special formatting needed, Urgent processing required..."
+                  placeholderTextColor="#9ca3af"
+                  value={remarks}
+                  onChangeText={setRemarks}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+              <Text style={styles.inputHint}>
+                Add any additional details about your document request
+              </Text>
+            </Animated.View>
           </View>
         </Animated.View>
       </View>

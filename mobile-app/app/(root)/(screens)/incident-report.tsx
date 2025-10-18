@@ -6,7 +6,6 @@ import {
     Image, ActivityIndicator, Alert,
     KeyboardAvoidingView, Platform, SafeAreaView,
     ScrollView,
-    Switch,
     Modal,
 } from "react-native";
 // Import camera, location, biometric auth, and routing utilities
@@ -33,11 +32,11 @@ type Media = {
 
 //  Coordinates defining the allowed geofence area for submissions
 const polygonCoordinates: [number, number][] = [
-    [120.9883678, 14.7157794],
-    [120.9890223, 14.7149233],
-    [120.9902561, 14.7154317],
-    [120.9898108, 14.716319],
-    [120.9883678, 14.7157794],
+    [120.9956744,14.4423801],
+    [120.9981045,14.440193],
+    [120.999526,14.4415126],
+    [120.9967205,14.4434762],
+    [120.9956744,14.4423801],
 ];
 
 //  Function to check if user's location is inside the polygon (geofencing)
@@ -83,7 +82,6 @@ const IncidentReportScreen = () => {
     const urgencies = ["Low", "Medium", "High"] as const;
     const [selectedCategory, setSelectedCategory] = useState<string>("");
     const [selectedUrgency, setSelectedUrgency] = useState<string>("");
-    const [isAnonymous, setIsAnonymous] = useState<boolean>(false);
     const [addressText, setAddressText] = useState<string>("");
     const [reportedAt, setReportedAt] = useState<string>("");
     const [isCategoryOpen, setIsCategoryOpen] = useState<boolean>(false);
@@ -334,7 +332,6 @@ const IncidentReportScreen = () => {
             formData.append('clerk_id', userId);
             formData.append('category', selectedCategory);
             formData.append('urgency', selectedUrgency);
-            formData.append('anonymous', String(isAnonymous));
             if (addressText) formData.append('address', addressText);
             if (reportedAt) formData.append('reported_at', reportedAt);
 
@@ -643,19 +640,6 @@ const IncidentReportScreen = () => {
                                 </View>
                             </View>
 
-                            {/* Anonymous Reporting */}
-                            <View style={styles.anonRow}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.inputLabel}>Report Anonymously</Text>
-                                    <Text style={styles.anonHint}>Your name will not be shared with responders.</Text>
-                                </View>
-                                <Switch
-                                    value={isAnonymous}
-                                    onValueChange={setIsAnonymous}
-                                    thumbColor={isAnonymous ? "#ef4444" : "#e2e8f0"}
-                                    trackColor={{ false: "#e2e8f0", true: "#fecaca" }}
-                                />
-                            </View>
                             <View style={styles.disclaimerBox}>
                                 <Ionicons name="shield-checkmark" size={18} color="#ef4444" style={{ marginRight: 8 }} />
                                 <Text style={styles.disclaimerText}>False reporting is punishable. Provide truthful and accurate details.</Text>

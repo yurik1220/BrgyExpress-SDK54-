@@ -8,10 +8,28 @@ const QUICK_FILTERS = [
     { label: 'Today', value: 'today' },
     { label: 'This Week', value: 'week' },
     { label: 'This Month', value: 'month' },
-    { label: 'Recent Activity', value: 'recent' },
-    { label: 'Logins', value: 'logins' },
-    { label: 'Approvals', value: 'approvals' },
-    { label: 'Rejections', value: 'rejections' }
+    { label: 'Last 7 Days', value: 'recent' },
+    { label: 'Last 30 Days', value: 'month30' }
+];
+
+// Action type filters
+const ACTION_FILTERS = [
+    { label: 'All Actions', value: '' },
+    { label: 'Admin Login', value: 'Admin Login' },
+    { label: 'Admin Logout', value: 'Admin Logout' },
+    { label: 'Create Announcement', value: 'Create Announcement' },
+    { label: 'Update Announcement', value: 'Update Announcement' },
+    { label: 'Delete Announcement', value: 'Delete Announcement' },
+    { label: 'Update Document Request', value: 'Update Document Request' },
+    { label: 'Update ID Request', value: 'Update ID Request' },
+    { label: 'Update Incident Report', value: 'Update Incident Report' }
+];
+
+// Status filters
+const STATUS_FILTERS = [
+    { label: 'All Status', value: 'all' },
+    { label: 'Success Only', value: 'success' },
+    { label: 'Failed Only', value: 'failed' }
 ];
 
 const AuditLogs = () => {
@@ -28,7 +46,8 @@ const AuditLogs = () => {
         action: '',
         admin_username: '',
         start_date: '',
-        end_date: ''
+        end_date: '',
+        status: 'all'
     });
     const [selectedQuickFilter, setSelectedQuickFilter] = useState('');
     const [showFilters, setShowFilters] = useState(false);
@@ -80,7 +99,8 @@ const AuditLogs = () => {
             action: '',
             admin_username: '',
             start_date: '',
-            end_date: ''
+            end_date: '',
+            status: 'all'
         });
         setSelectedQuickFilter('');
         setPagination(prev => ({ ...prev, page: 1 }));
@@ -97,7 +117,8 @@ const AuditLogs = () => {
             action: '',
             admin_username: '',
             start_date: '',
-            end_date: ''
+            end_date: '',
+            status: 'all'
         };
         
         switch (filterValue) {
@@ -109,6 +130,13 @@ const AuditLogs = () => {
                 newFilters.end_date = today.toISOString().split('T')[0];
                 break;
             case 'week':
+                // Get start of current week (Monday)
+                const dayOfWeek = today.getDay();
+                const daysToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Sunday = 0, so go back 6 days
+                const startOfWeek = new Date(today);
+                startOfWeek.setDate(today.getDate() + daysToMonday);
+                startOfWeek.setHours(0, 0, 0, 0);
+                
                 newFilters.start_date = startOfWeek.toISOString().split('T')[0];
                 newFilters.end_date = today.toISOString().split('T')[0];
                 break;
@@ -120,14 +148,9 @@ const AuditLogs = () => {
                 newFilters.start_date = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
                 newFilters.end_date = today.toISOString().split('T')[0];
                 break;
-            case 'logins':
-                newFilters.action = 'Admin Login';
-                break;
-            case 'approvals':
-                newFilters.action = 'Update';
-                break;
-            case 'rejections':
-                newFilters.action = 'Update';
+            case 'month30':
+                newFilters.start_date = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                newFilters.end_date = today.toISOString().split('T')[0];
                 break;
             default:
                 break;
@@ -159,27 +182,27 @@ const AuditLogs = () => {
 
     const getActionIcon = (action) => {
         const actionIcons = {
-            'Admin Login': '🔑',
-            'Admin Logout': '🚪',
-            'Admin Registration': '👤',
-            'Admin Creation': '➕',
-            'Create Announcement': '📢',
-            'Delete Announcement': '🗑️',
-            'Update Announcement': '✏️',
-            'Update Document Request': '📄',
-            'Update ID Request': '🆔',
-            'Update Incident Report': '🚨'
+            'Admin Login': '•',
+            'Admin Logout': '•',
+            'Admin Registration': '•',
+            'Admin Creation': '•',
+            'Create Announcement': '•',
+            'Delete Announcement': '•',
+            'Update Announcement': '•',
+            'Update Document Request': '•',
+            'Update ID Request': '•',
+            'Update Incident Report': '•'
         };
-        return actionIcons[action] || '📋';
+        return actionIcons[action] || '•';
     };
 
     const getStatusFromDetails = (details) => {
         try {
             const parsed = JSON.parse(details);
             // Check if responseSuccess is explicitly false, otherwise consider it success
-            return parsed.responseSuccess === false ? '❌ Failed' : '✅ Success';
+            return parsed.responseSuccess === false ? 'Failed' : 'Success';
         } catch {
-            return '❓ Unknown';
+            return 'Unknown';
         }
     };
 
@@ -204,36 +227,12 @@ const AuditLogs = () => {
     return (
         <div className="audit-logs-container">
             <div className="audit-logs-header">
-                <h1>📋 Audit Logs</h1>
-                <p>Track all administrative actions and system activities</p>
+                <div className="header-content">
+                    <h1>Audit Logs</h1>
+                    <p>Track all administrative actions and system activities</p>
+                </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="audit-stats">
-                <div className="stat-card">
-                    <div className="stat-number">{pagination.total}</div>
-                    <div className="stat-label">Total Logs</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-number">{logs.filter(log => {
-                        try {
-                            const parsed = JSON.parse(log.details);
-                            return parsed.responseSuccess !== false; // Consider success unless explicitly false
-                        } catch {
-                            return true; // If we can't parse, assume success
-                        }
-                    }).length}</div>
-                    <div className="stat-label">Successful Actions</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-number">{logs.filter(log => log.action === 'Admin Login').length}</div>
-                    <div className="stat-label">Login Attempts</div>
-                </div>
-                <div className="stat-card">
-                    <div className="stat-number">{new Set(logs.map(log => log.admin_username)).size}</div>
-                    <div className="stat-label">Active Admins</div>
-                </div>
-            </div>
 
             {/* Quick Filters */}
             <div className="quick-filters">
@@ -248,6 +247,12 @@ const AuditLogs = () => {
                             {filter.label}
                         </button>
                     ))}
+                    <button 
+                        className="toggle-filters-btn"
+                        onClick={() => setShowFilters(!showFilters)}
+                    >
+                        {showFilters ? 'Hide' : 'Show'} Advanced Filters
+                    </button>
                 </div>
                 {selectedQuickFilter && (
                     <div className="active-filter-info">
@@ -262,63 +267,85 @@ const AuditLogs = () => {
                 )}
             </div>
 
-            {/* Advanced Filters Toggle */}
-            <div className="advanced-filters-toggle">
-                <button 
-                    className="toggle-filters-btn"
-                    onClick={() => setShowFilters(!showFilters)}
-                >
-                    {showFilters ? '🔽 Hide' : '🔼 Show'} Advanced Filters
-                </button>
-            </div>
-
             {/* Advanced Filters */}
             {showFilters && (
                 <div className="audit-filters">
-                    <div className="filter-row">
-                        <div className="filter-group">
-                            <label>Action:</label>
-                            <input
-                                type="text"
-                                name="action"
-                                value={filters.action}
-                                onChange={handleFilterChange}
-                                placeholder="Filter by action..."
-                            />
-                        </div>
-                        <div className="filter-group">
-                            <label>Admin Username:</label>
-                            <input
-                                type="text"
-                                name="admin_username"
-                                value={filters.admin_username}
-                                onChange={handleFilterChange}
-                                placeholder="Filter by username..."
-                            />
+                    <div className="filter-section">
+                        <h4>Time Range</h4>
+                        <div className="filter-row">
+                            <div className="filter-group">
+                                <label>Start Date:</label>
+                                <input
+                                    type="date"
+                                    name="start_date"
+                                    value={filters.start_date}
+                                    onChange={handleFilterChange}
+                                />
+                            </div>
+                            <div className="filter-group">
+                                <label>End Date:</label>
+                                <input
+                                    type="date"
+                                    name="end_date"
+                                    value={filters.end_date}
+                                    onChange={handleFilterChange}
+                                />
+                            </div>
                         </div>
                     </div>
-                    <div className="filter-row">
-                        <div className="filter-group">
-                            <label>Start Date:</label>
-                            <input
-                                type="date"
-                                name="start_date"
-                                value={filters.start_date}
-                                onChange={handleFilterChange}
-                            />
+
+                    <div className="filter-section">
+                        <h4>Action Type</h4>
+                        <div className="filter-row">
+                            <div className="filter-group">
+                                <label>Action:</label>
+                                <select
+                                    name="action"
+                                    value={filters.action}
+                                    onChange={handleFilterChange}
+                                >
+                                    {ACTION_FILTERS.map(filter => (
+                                        <option key={filter.value} value={filter.value}>
+                                            {filter.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="filter-group">
+                                <label>Status:</label>
+                                <select
+                                    name="status"
+                                    value={filters.status}
+                                    onChange={handleFilterChange}
+                                >
+                                    {STATUS_FILTERS.map(filter => (
+                                        <option key={filter.value} value={filter.value}>
+                                            {filter.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
                         </div>
-                        <div className="filter-group">
-                            <label>End Date:</label>
-                            <input
-                                type="date"
-                                name="end_date"
-                                value={filters.end_date}
-                                onChange={handleFilterChange}
-                            />
+                    </div>
+
+                    <div className="filter-section">
+                        <div className="filter-row">
+                            <div className="filter-group">
+                                <label>Admin Username:</label>
+                                <input
+                                    type="text"
+                                    name="admin_username"
+                                    value={filters.admin_username}
+                                    onChange={handleFilterChange}
+                                    placeholder="Filter by username..."
+                                />
+                            </div>
+                            <div className="filter-group">
+                                <button className="clear-filters-btn" onClick={clearFilters}>
+                                    Clear All Filters
+                                </button>
+                            </div>
                         </div>
-                        <button className="clear-filters-btn" onClick={clearFilters}>
-                            🗑️ Clear All Filters
-                        </button>
                     </div>
                 </div>
             )}
@@ -334,12 +361,11 @@ const AuditLogs = () => {
                 <table className="audit-logs-table">
                     <thead>
                         <tr>
-                            <th>📅 Time</th>
-                            <th>👤 Admin</th>
-                            <th>🎯 Action</th>
-                            <th>✅ Status</th>
-                            <th>🌐 IP Address</th>
-                            <th>📋 Details</th>
+                            <th>Time</th>
+                            <th>Admin</th>
+                            <th>Action</th>
+                            <th>Status</th>
+                            <th>Details</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -353,8 +379,8 @@ const AuditLogs = () => {
                                 </td>
                                 <td className="admin">
                                     <div className="admin-info">
-                                        <div className="admin-name">{log.admin_username || 'Unknown'}</div>
-                                        <div className="admin-id">ID: {log.admin_id || 'N/A'}</div>
+                                        <div className="admin-name">{log.admin_username || 'System'}</div>
+                                        <div className="admin-role">{log.admin_role || 'Administrator'}</div>
                                     </div>
                                 </td>
                                 <td className="action">
@@ -372,12 +398,6 @@ const AuditLogs = () => {
                                     <span className={`status-badge ${getStatusClass(log.details)}`}>
                                         {getStatusFromDetails(log.details)}
                                     </span>
-                                </td>
-                                <td className="ip">
-                                    <div className="ip-info">
-                                        <div className="ip-address">{log.ip_address || 'N/A'}</div>
-                                        <div className="user-agent">{log.user_agent ? log.user_agent.substring(0, 30) + '...' : 'N/A'}</div>
-                                    </div>
                                 </td>
                                 <td className="details">
                                     <button 
@@ -402,7 +422,7 @@ const AuditLogs = () => {
                                         }}
                                         title="View detailed information"
                                     >
-                                        👁️ View
+                                        View
                                     </button>
                                 </td>
                             </tr>

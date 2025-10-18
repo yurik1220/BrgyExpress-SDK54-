@@ -1,21 +1,16 @@
 // Session Management for Auto-Logout
 class SessionManager {
     constructor() {
-        this.SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+        this.SESSION_TIMEOUT = 5 * 60 * 1000; // 5 minutes
         this.sessionTimer = null;
         this.sessionStartTime = null;
         this.isActive = false;
         this.isLoggingOut = false; // Prevent multiple logout calls
+        this.timerEndTime = null; // Track when the timer will expire
         this.init();
     }
 
     init() {
-        // Reset timer on user activity
-        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-        events.forEach(event => {
-            document.addEventListener(event, () => this.resetTimer(), true);
-        });
-
         // Check if user is already logged in
         const adminData = localStorage.getItem('adminData');
         const adminToken = localStorage.getItem('adminToken');
@@ -33,24 +28,19 @@ class SessionManager {
         this.isActive = true;
         this.isLoggingOut = false; // Reset logout flag
         this.sessionStartTime = Date.now();
-        this.resetTimer();
-    }
-
-    resetTimer() {
-        if (!this.isActive) return;
-
+        this.timerEndTime = Date.now() + this.SESSION_TIMEOUT;
+        
         // Clear existing timer
         if (this.sessionTimer) {
             clearTimeout(this.sessionTimer);
         }
 
-        // Reset session start time
-        this.sessionStartTime = Date.now();
-
-        // Set new timer
+        // Set fixed timeout - session will expire after 5 minutes regardless of activity
         this.sessionTimer = setTimeout(() => {
             this.logout();
         }, this.SESSION_TIMEOUT);
+        
+        console.log('Session started, will expire at:', new Date(this.timerEndTime).toLocaleTimeString());
     }
 
     logout(force = false) {
@@ -62,9 +52,13 @@ class SessionManager {
         this.isLoggingOut = true;
         this.isActive = false;
         this.sessionStartTime = null;
+        this.timerEndTime = null;
         if (this.sessionTimer) {
             clearTimeout(this.sessionTimer);
+            this.sessionTimer = null;
         }
+        
+        console.log('Session logged out');
 
         // Call logout endpoint to log the action
         fetch('http://localhost:5000/api/admin/logout', {
@@ -132,19 +126,16 @@ class SessionManager {
 
     // Get remaining session time in minutes
     getRemainingTime() {
-        if (!this.sessionTimer || !this.sessionStartTime) return 0;
+        if (!this.timerEndTime) return 0;
         
-        const elapsed = Date.now() - this.sessionStartTime;
-        const remaining = this.SESSION_TIMEOUT - elapsed;
-        return Math.max(0, remaining / 60000); // Convert to minutes
+        const now = Date.now();
+        const remaining = this.timerEndTime - now;
+        const remainingMinutes = Math.max(0, remaining / 60000); // Convert to minutes
+        
+        console.log('Remaining time:', remainingMinutes.toFixed(2), 'minutes');
+        return remainingMinutes;
     }
 
-    // Extend session (called when user performs actions)
-    extendSession() {
-        if (this.isActive) {
-            this.resetTimer();
-        }
-    }
 
     // Validate session with backend
     async validateSession() {
@@ -173,6 +164,13 @@ class SessionManager {
         const adminData = localStorage.getItem('adminData');
         const adminToken = localStorage.getItem('adminToken');
         return !!(adminData && adminToken && this.isActive);
+    }
+
+    // Check if session is about to expire (less than 1 minute)
+    isSessionExpiringSoon() {
+        if (!this.isSessionValid()) return false;
+        const remaining = this.getRemainingTime();
+        return remaining <= 1 && remaining > 0;
     }
 }
 
