@@ -1,6 +1,6 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
-python-dateutil==2.8.2
-pillow==9.5.0
-pyzbar==0.1.9
+fastapi
+uvicorn[standard]
+python-multipart
+python-dateutil
+pillow
+pyzbar
