@@ -42,12 +42,7 @@
       "favicon": "./assets/images/bx-logo.png"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://uber.dev/"
-        }
-      ],
+      "expo-router",
       [
         "expo-build-properties",
         {
@@ -67,9 +62,6 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {
-        "origin": "https://uber.dev/"
-      },
       "eas": {
         "projectId": "5ac63e34-d480-43f7-a20b-289e2c961280"
       }

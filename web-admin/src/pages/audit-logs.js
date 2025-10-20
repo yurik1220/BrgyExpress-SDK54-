@@ -15,14 +15,9 @@ const QUICK_FILTERS = [
 // Action type filters
 const ACTION_FILTERS = [
     { label: 'All Actions', value: '' },
-    { label: 'Admin Login', value: 'Admin Login' },
-    { label: 'Admin Logout', value: 'Admin Logout' },
-    { label: 'Create Announcement', value: 'Create Announcement' },
-    { label: 'Update Announcement', value: 'Update Announcement' },
-    { label: 'Delete Announcement', value: 'Delete Announcement' },
-    { label: 'Update Document Request', value: 'Update Document Request' },
-    { label: 'Update ID Request', value: 'Update ID Request' },
-    { label: 'Update Incident Report', value: 'Update Incident Report' }
+    { label: 'Login', value: 'Admin Login' },
+    { label: 'Logout', value: 'Admin Logout' },
+    { label: 'Updates', value: 'Update' }
 ];
 
 // Status filters
@@ -64,7 +59,12 @@ const AuditLogs = () => {
             const response = await api.get(`/api/admin/audit-logs?${params}`);
             
             if (response.data.success) {
-                setLogs(response.data.data);
+                // Keep only Login, Logout, and any Update actions
+                const filtered = (response.data.data || []).filter(log => {
+                    const action = log?.action || '';
+                    return action === 'Admin Login' || action === 'Admin Logout' || action.includes('Update');
+                });
+                setLogs(filtered);
                 setPagination(response.data.pagination);
             } else {
                 setError('Failed to fetch audit logs');
@@ -165,35 +165,19 @@ const AuditLogs = () => {
     };
 
     const getActionColor = (action) => {
-        const actionColors = {
-            'Admin Login': '#28a745',
-            'Admin Logout': '#6c757d',
-            'Admin Registration': '#17a2b8',
-            'Admin Creation': '#007bff',
-            'Create Announcement': '#28a745',
-            'Delete Announcement': '#dc3545',
-            'Update Announcement': '#ffc107',
-            'Update Document Request': '#fd7e14',
-            'Update ID Request': '#6f42c1',
-            'Update Incident Report': '#e83e8c'
-        };
-        return actionColors[action] || '#6c757d';
+        // Categorize actions into three main types
+        if (action === 'Admin Login') return '#28a745'; // Green for login
+        if (action === 'Admin Logout') return '#6c757d'; // Gray for logout
+        if (action && action.includes('Update')) return '#007bff'; // Blue for all updates
+        return '#6c757d'; // Default gray
     };
 
     const getActionIcon = (action) => {
-        const actionIcons = {
-            'Admin Login': '•',
-            'Admin Logout': '•',
-            'Admin Registration': '•',
-            'Admin Creation': '•',
-            'Create Announcement': '•',
-            'Delete Announcement': '•',
-            'Update Announcement': '•',
-            'Update Document Request': '•',
-            'Update ID Request': '•',
-            'Update Incident Report': '•'
-        };
-        return actionIcons[action] || '•';
+        // Categorize actions into three main types
+        if (action === 'Admin Login') return '•';
+        if (action === 'Admin Logout') return '•';
+        if (action && action.includes('Update')) return '•';
+        return '•';
     };
 
     const getStatusFromDetails = (details) => {
@@ -390,7 +374,9 @@ const AuditLogs = () => {
                                             className="action-badge"
                                             style={{ backgroundColor: getActionColor(log.action) }}
                                         >
-                                            {log.action}
+                                            {log.action === 'Admin Login' ? 'Login' : 
+                                             log.action === 'Admin Logout' ? 'Logout' : 
+                                             log.action}
                                         </span>
                                     </div>
                                 </td>

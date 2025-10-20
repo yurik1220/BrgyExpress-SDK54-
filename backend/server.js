@@ -1912,7 +1912,7 @@ app.get("/api/users/:clerkID", async (req, res) => {
 
     try {
         const userQuery = await pool.query(
-            "SELECT id, username, name, clerk_id FROM users WHERE clerk_id = $1",
+            "SELECT id, username, name, clerk_id, email, phonenumber FROM users WHERE clerk_id = $1",
             [clerkID]
         );
 
@@ -1962,7 +1962,9 @@ app.get("/api/users/:clerkID", async (req, res) => {
             clerk_id: user.clerk_id,
             requests_completed: completedCount,
             requests_pending: pendingCount,
-            member_since: memberSince.rows[0].earliest_date || new Date().toISOString()
+            member_since: memberSince.rows[0].earliest_date || new Date().toISOString(),
+            email: user.email || null,
+            phonenumber: user.phonenumber || null
         };
 
         res.status(200).json(response);

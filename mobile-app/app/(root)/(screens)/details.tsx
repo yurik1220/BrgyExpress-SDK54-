@@ -109,19 +109,37 @@ const DetailsScreen = () => {
   };
 
   const getStatusColor = () => {
-    switch(status) {
-      case 'approved': return '#4CAF50';
-      case 'rejected': return '#F44336';
-      default: return '#2196F3';
+    // Enforce color by request type regardless of status
+    if (type === 'Incident Report') return '#F44336'; // red
+    if (type === 'Create ID') return '#4CAF50'; // green
+
+    // Document Request: force "complete"/"approved" to blue to match pending
+    if (type === 'Document Request') {
+      const s = String(status || '').toLowerCase();
+      if (s === 'approved' || s === 'completed' || s === 'complete') return '#2196F3'; // blue
+      if (s === 'rejected') return '#F44336'; // red
+      return '#2196F3'; // pending/others -> blue
     }
+
+    // Default fallback
+    return '#2196F3';
   };
 
   const getStatusGradient = () => {
-    switch(status) {
-      case 'approved': return ['#4CAF50', '#45a049'] as const;
-      case 'rejected': return ['#F44336', '#e53935'] as const;
-      default: return ['#2196F3', '#1e88e5'] as const;
+    // Enforce gradient by request type regardless of status
+    if (type === 'Incident Report') return ['#F44336', '#e53935'] as const; // red
+    if (type === 'Create ID') return ['#4CAF50', '#45a049'] as const; // green
+
+    // Document Request: force "complete"/"approved" to blue to match pending
+    if (type === 'Document Request') {
+      const s = String(status || '').toLowerCase();
+      if (s === 'approved' || s === 'completed' || s === 'complete') return ['#2196F3', '#1e88e5'] as const; // blue
+      if (s === 'rejected') return ['#F44336', '#e53935'] as const; // red
+      return ['#2196F3', '#1e88e5'] as const; // pending/others -> blue
     }
+
+    // Default fallback
+    return ['#2196F3', '#1e88e5'] as const;
   };
 
   const handleBackPress = () => {

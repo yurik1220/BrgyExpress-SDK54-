@@ -17,11 +17,36 @@ class SessionManager {
         
         if (adminData && adminToken) {
             this.startSession();
+            this.setupActivityListeners();
         } else {
             // Clear any invalid data
             localStorage.removeItem('adminData');
             localStorage.removeItem('adminToken');
         }
+    }
+
+    setupActivityListeners() {
+        // Listen for user activity to reset session
+        const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        
+        const resetSession = () => {
+            if (this.isActive) {
+                console.log('User activity detected, resetting session');
+                this.startSession(); // Reset the 5-minute timer
+            }
+        };
+
+        // Add event listeners
+        activityEvents.forEach(event => {
+            document.addEventListener(event, resetSession, true);
+        });
+
+        // Store cleanup function
+        this.cleanupActivityListeners = () => {
+            activityEvents.forEach(event => {
+                document.removeEventListener(event, resetSession, true);
+            });
+        };
     }
 
     startSession() {
@@ -56,6 +81,11 @@ class SessionManager {
         if (this.sessionTimer) {
             clearTimeout(this.sessionTimer);
             this.sessionTimer = null;
+        }
+
+        // Clean up activity listeners
+        if (this.cleanupActivityListeners) {
+            this.cleanupActivityListeners();
         }
         
         console.log('Session logged out');

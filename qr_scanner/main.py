@@ -1,13 +1,25 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
-from pyzbar.pyzbar import decode as qr_decode
 from PIL import Image
 from io import BytesIO
 import json
 import uuid
 from typing import Optional, Dict, Any, Tuple
 from dateutil import parser as date_parser
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Try to import pyzbar with error handling
+try:
+    from pyzbar.pyzbar import decode as qr_decode
+    logger.info("pyzbar imported successfully")
+except ImportError as e:
+    logger.error(f"Failed to import pyzbar: {e}")
+    raise ImportError("pyzbar is required but not properly installed. Please install zbar system library.")
 
 
 app = FastAPI()
@@ -16,12 +28,24 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,  # Fixed: Can't use True with allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 UNWANTED_KEYS = {"raw", "bf", "bt", "n_s", "p", "v", "z"}
+
+
+@app.on_event("startup")
+async def startup_event():
+    logger.info("QR Scanner API starting up...")
+    logger.info("pyzbar library loaded successfully")
+    logger.info("API is ready to accept requests")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    logger.info("QR Scanner API shutting down...")
 
 
 def normalize_dob(dob_str: str) -> Optional[str]:
@@ -170,6 +194,25 @@ def not_found_response() -> Dict[str, Any]:
     }
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "qr-scanner"}
+
+
+@app.get("/")
+async def root():
+    return {
+        "message": "BrgyExpress QR Scanner API",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "scan_qr": "/scan_qr (POST)",
+            "docs": "/docs",
+            "redoc": "/redoc"
+        }
+    }
+
+
 @app.post("/scan_qr")
 async def scan_qr(image: UploadFile = File(...)) -> JSONResponse:
     try:
@@ -209,3 +252,7 @@ async def scan_qr(image: UploadFile = File(...)) -> JSONResponse:
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
+if __name__ == "__main__":
+    import uvicorn
+    logger.info("Starting QR Scanner API server...")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

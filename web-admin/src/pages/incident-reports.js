@@ -358,6 +358,12 @@ const IncidentReports = () => {
                                     Start Investigation
                                 </button>
                             )}
+                            {selectedReport.status === 'in_progress' && (
+                                <button className="btn-success" onClick={() => { setShowDetailsModal(false); setActionType('resolved'); setShowActionModal(true); }}>
+                                    <i className="fas fa-check"></i>
+                                    Close Investigation
+                                </button>
+                            )}
                             {selectedReport.location && (
                                 <button className="btn-primary" onClick={() => {
                                     const [longitude, latitude] = selectedReport.location.split(',').map(Number);
@@ -392,40 +398,38 @@ const IncidentReports = () => {
             {/* Enhanced Action Modal */}
             {showActionModal && selectedReport && (
                 <div className="modal-overlay">
-                    <div className="modal">
+                    <div className="modal square-modal">
                         <div className="modal-header">
                             <h3>
-                                {actionType === "investigating" ? "Start Investigation" : "Mark as Resolved"}
+                                {actionType === "investigating" ? "Start Investigation" : actionType === "resolved" ? "Close Investigation" : "Mark as Resolved"}
                             </h3>
                             <button className="close-btn" onClick={() => setShowActionModal(false)}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-                                {selectedReport?.media_url && (
-                                    <div style={{ borderRadius: 10, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
-                                        {/\.(mp4|webm|ogg)$/i.test(selectedReport.media_url) ? (
-                                            <video controls style={{ width: '100%', maxHeight: 360 }}>
-                                                <source src={toAbsoluteUrl(selectedReport.media_url)} />
-                                                Your browser does not support the video tag.
-                                            </video>
-                                        ) : (
-                                            <img src={toAbsoluteUrl(selectedReport.media_url)} alt="Incident media" style={{ width: '100%', maxHeight: 360, objectFit: 'cover' }} />
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="incident-details">
-                                    <div className="detail-item">
-                                        <span className="label">Title:</span>
-                                        <span className="value">{selectedReport.title}</span>
-                                    </div>
-                                    <div className="detail-item">
-                                        <span className="label">Date:</span>
-                                        <span className="value">{new Date(selectedReport.created_at).toLocaleString()}</span>
-                                    </div>
+                        <div className="modal-body" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ textAlign: 'center', padding: '8px' }}>
+                                <div style={{ 
+                                    width: 60, 
+                                    height: 60, 
+                                    borderRadius: '50%', 
+                                    backgroundColor: actionType === 'investigating' ? '#fef3c7' : '#d1fae5',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    margin: '0 auto 12px',
+                                    fontSize: '22px',
+                                    color: actionType === 'investigating' ? '#f59e0b' : '#10b981'
+                                }}>
+                                    <i className={`fas fa-${actionType === 'investigating' ? 'search' : 'check'}`}></i>
                                 </div>
+                                <p style={{ margin: '0 0 12px', color: '#6b7280', fontSize: '14px', lineHeight: '1.4' }}>
+                                    {actionType === 'investigating' 
+                                        ? 'Start investigating this incident?' 
+                                        : 'Close this investigation?'
+                                    }
+                                </p>
+                                
                             </div>
                         </div>
                         <div className="modal-actions">
@@ -433,10 +437,10 @@ const IncidentReports = () => {
                                 Cancel
                             </button>
                             <button 
-                                className={actionType === "investigating" ? "btn-warning" : "btn-success"}
+                                className={actionType === "investigating" ? "btn-warning" : actionType === "resolved" ? "btn-success" : "btn-success"}
                                 onClick={handleAction}
                             >
-                                {actionType === "investigating" ? "Start Investigation" : "Mark Resolved"}
+                                {actionType === "investigating" ? "Start Investigation" : actionType === "resolved" ? "Close Investigation" : "Mark Resolved"}
                             </button>
                         </div>
                     </div>

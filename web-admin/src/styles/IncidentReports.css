@@ -732,3 +732,35 @@
         flex-direction: column;
     }
 }
+
+/* Square Modal Styles */
+.square-modal {
+    width: 350px !important;
+    height: 350px !important;
+    max-width: 350px !important;
+    max-height: 350px !important;
+    min-width: 350px !important;
+    min-height: 350px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.square-modal .modal-header {
+    padding: 12px 16px !important;
+    flex-shrink: 0;
+}
+
+.square-modal .modal-body {
+    flex: 1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px !important;
+}
+
+.square-modal .modal-actions {
+    padding: 12px 16px !important;
+    flex-shrink: 0;
+}
