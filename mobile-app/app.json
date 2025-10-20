@@ -4,11 +4,11 @@
     "slug": "brgyexpress",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/bx-logo.png",
+    "icon": "./assets/images/bx-logo1.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/bx-logo.png",
+      "image": "./assets/images/bx-logo1.png",
       "resizeMode": "contain",
       "backgroundColor": "#FAF9F6"
     },
@@ -28,7 +28,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/bx-logo.png",
+        "foregroundImage": "./assets/images/bx-logo1.png",
         "backgroundColor": "#999999"
       },
       "package": "com.yurik1220.brgyexpress",
@@ -39,7 +39,7 @@
     "web": {
       "bundler": "metro",
       "output": "server",
-      "favicon": "./assets/images/bx-logo.png"
+      "favicon": "./assets/images/bx-logo1.png"
     },
     "plugins": [
       "expo-router",
